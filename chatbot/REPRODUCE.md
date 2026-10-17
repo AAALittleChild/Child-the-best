@@ -8,7 +8,18 @@
 
 3\. 准备好可用的 API Key
 
+> Evidence tag: runtime, description
+### main.py 代码逻辑说明
+1. **接收请求部分：ChatReq 模型 和 /chat 接口**
+使用 pydantic 的 ChatReq 数据模型定义请求体结构，里面包含 message 字段。`@app.post("/chat")` 装饰器注册 POST 接口，当前端发送POST请求到 /chat，FastAPI 会自动把前端传来的 json 数据校验、解析为 ChatReq 对象，拿到里面的 message。
 
+2. **转发到 DeepSeek 接口：headers、payload、httpx**
+构造请求头 headers，携带 Authorization 鉴权信息（从环境变量读取 API_KEY）；payload 按照 DeepSeek 接口规范组装模型参数，把上一步拿到的用户 message 放进对话消息列表。使用 httpx 客户端发起 POST 请求，将 payload 发送给 DeepSeek 的 `/v1/chat/completions` 大模型接口，等待大模型返回结果。
+
+3. **解析响应并返回**
+拿到 DeepSeek 返回的响应 json 数据 res_data，读取 `res_data["choices"][0]["message"]["content"]`，这一段就是大模型生成的回答内容。最后包装成 `{"reply": 回答文本}` 的字典，作为接口返回值给到前端页面。
+
+补充运行证据：启动命令 `uvicorn main:app --reload --host 0.0.0.0 --port 8000`，启动成功后控制台输出服务监听日志，访问 http://127.0.0.1:8000/docs 可以打开 FastAPI 自动接口文档页面，验证接口可访问。
 
 \## 步骤1：拉取/拿到项目代码
 
