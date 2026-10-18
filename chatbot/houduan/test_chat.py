@@ -70,7 +70,7 @@ def test_upstream_401_returns_readable_error(client, monkeypatch, capsys):
     assert response.status_code == 401
     assert "401" in response.json()["detail"]
     assert "DEEPSEEK_API_KEY" in response.json()["detail"]
-    log = capsys.readouterr().out
+    log = capsys.readouterr().err
     assert "[upstream] 401" in log
     assert "invalid key" in log
     assert "test-key-not-real" not in log
@@ -86,7 +86,7 @@ def test_upstream_5xx_returns_502(client, monkeypatch, capsys):
 
     assert response.status_code == 502
     assert "503" in response.json()["detail"]
-    log = capsys.readouterr().out
+    log = capsys.readouterr().err
     assert "[upstream] 503" in log
     assert "unavailable" in log
 
@@ -101,7 +101,7 @@ def test_timeout_returns_504(client, monkeypatch, capsys):
 
     assert response.status_code == 504
     assert "超时" in response.json()["detail"]
-    assert "[upstream] timeout" in capsys.readouterr().out
+    assert "[upstream] timeout" in capsys.readouterr().err
 
 
 def test_connect_error_returns_503(client, monkeypatch, capsys):
@@ -117,7 +117,7 @@ def test_connect_error_returns_503(client, monkeypatch, capsys):
 
     assert response.status_code == 503
     assert "无法连接" in response.json()["detail"]
-    assert "[upstream] connect_error" in capsys.readouterr().out
+    assert "[upstream] connect_error" in capsys.readouterr().err
 
 
 def test_malformed_upstream_payload_returns_502(client, monkeypatch, capsys):
@@ -130,7 +130,7 @@ def test_malformed_upstream_payload_returns_502(client, monkeypatch, capsys):
 
     assert response.status_code == 502
     assert "格式异常" in response.json()["detail"]
-    log = capsys.readouterr().out
+    log = capsys.readouterr().err
     assert "[upstream] 200 parse_error:KeyError" in log
     assert "unexpected" in log
 

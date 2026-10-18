@@ -73,7 +73,13 @@ HTTP/1.1 503 Service Unavailable
 {"detail":"后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。"}
 ```
 
-现在服务端还会为上游异常打印诊断行，例如 `[upstream] 401 {"error":{"message":"invalid key"}}`。响应体截断到 200 字符，不打印 `Authorization` 头或 API Key。
+现在服务端还会为上游异常把诊断行写到 stderr，例如：
+
+```text
+[upstream] 402 {"error":{"message":"Insufficient Balance","type":"insufficient_quota"}}
+```
+
+响应体截断到 200 字符，不打印 `Authorization` 头或 API Key。写到 stderr 是为了与 uvicorn 的 INFO 日志走同一采集流，避免只抓 stderr 时漏掉上游原文。
 
 ## 3. 按“后端端口 → 前端地址 → CORS”的三步定位
 

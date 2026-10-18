@@ -416,7 +416,7 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 - 响应解析失败：`[upstream] <status> parse_error:<异常类型> <响应体前 200 字符，换行替换为空格>`
 - 其他传输错误：`[upstream] http_error <异常文本>`
 
-日志只打印状态码和截断后的响应体，不打印 `Authorization` 头或 API Key。使用 `print(..., flush=True)`，在 uvicorn 终端立即可见。
+日志只打印状态码和截断后的响应体，不打印 `Authorization` 头或 API Key。使用 `print(..., file=sys.stderr, flush=True)`，与 uvicorn 的 INFO 日志走同一个终端流，避免只采集 stderr 时漏掉。
 
 仍需如实说明的边界：
 

@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import sys
 from typing import Optional
 
 import httpx
@@ -39,7 +40,7 @@ def _log_upstream(status: object, text: object = "", kind: str = "") -> None:
     prefix = f"[upstream] {status}"
     if kind:
         prefix += f" {kind}"
-    print(f"{prefix} {body}".rstrip(), flush=True)
+    print(f"{prefix} {body}".rstrip(), file=sys.stderr, flush=True)
 
 
 def _get_api_key() -> str:

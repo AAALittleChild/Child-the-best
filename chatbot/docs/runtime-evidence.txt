@@ -198,15 +198,35 @@ This confirms that the final page still sends the request, reads the JSON
 detail on a non-2xx response, renders it, and no longer emits A/B/C debug logs.
 
 ============================================================
-F. Upstream error log verification
+F. Upstream error log verification (live uvicorn)
 ============================================================
 
-After adding the [upstream] log, a temporary TestClient probe with a fake 401
-response produced:
+A temporary stub upstream returned HTTP 402 with:
+
+    {"error":{"message":"Insufficient Balance","type":"insufficient_quota"}}
+
+The current backend was started with uvicorn on port 8000. POST /chat returned:
+
+    HTTP/1.1 402 Payment Required
+    {"detail":"大模型账户余额不足（402），请充值后重试。"}
+
+Backend stderr (the same stream as uvicorn's INFO logs):
+
+    INFO:     Started server process [28200]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+    [upstream] 402 {"error":{"message":"Insufficient Balance","type":"insufficient_quota"}}
+
+Backend stdout (access log):
+
+    INFO:     127.0.0.1:56061 - "POST /chat HTTP/1.1" 402 Payment Required
+
+The [upstream] line is now written to stderr, so it remains visible when only
+the uvicorn error stream is collected. The response body is truncated to 200
+characters and the line does not contain the Authorization header or API key.
+
+A separate TestClient probe with a fake 401 also produced:
 
     [upstream] 401 {"error":{"message":"invalid key"}}
     HTTP 401 {'detail': '大模型服务鉴权失败（401）：DEEPSEEK_API_KEY 无效或已失效。'}
-
-The probe was removed after capture. The log contains the upstream status and
-the response body truncated to 200 characters; it does not contain the
-Authorization header or the API key.
