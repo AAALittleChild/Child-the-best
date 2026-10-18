@@ -432,7 +432,7 @@ INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
 
 成功路径没有 `[upstream]` 错误行。后端实际执行了 `res_data["choices"][0]["message"]["content"]` 并把结果返回为 `{"reply": ...}`，前端再把它显示到页面，说明 `choices` 结构和 `content` 字段都能正常取值。Key 只从本机 `.env` 读入进程环境，没有出现在页面、终端或仓库中。
 
-成功路径的兜底边界：这段代码没有内容级兜底。`chatbot/houduan/main.py:99` 直接执行 `res_data["choices"][0]["message"]["content"]`，没有 `.get()`、默认回复、重试或备用模型；`choices` 缺失/为空、`message` 或 `content` 缺失时，由 `main.py:128` 的 `except (KeyError, IndexError, TypeError, ValueError)` 捕获，并返回 `main.py:136` 的 502「大模型返回格式异常」。如果 `content` 存在但为 `null` 或非字符串，代码没有非空/类型校验，会原样返回，页面可能显示空内容。因此这里的兜底只是“失败转 502”，不是“成功内容兜底”。
+成功路径的兜底边界分两层。第一层是**不做事前结构校验**：`chatbot/houduan/main.py:99` 直接执行 `res_data["choices"][0]["message"]["content"]`，没有用 JSON Schema 或 Pydantic 校验上游响应，也没有 `.get()`、默认回复、重试或备用模型；只要 `choices`、`message`、`content` 的结构与预期不一致，就会在取值时抛异常。第二层是**事后异常归一**：`main.py:128` 捕获 `KeyError`、`IndexError`、`TypeError`、`ValueError` 四类异常，统一返回 `main.py:136` 的 502「大模型返回格式异常，未能解析出回复内容。」；其中 `ValueError` 也覆盖 `resp.json()` 解码失败。局限是这四类异常在 HTTP 响应里都折叠成同一句 502，调用方分不清是上游格式变更、字段缺失、`choices` 为空、类型不对还是返回非 JSON；只有服务端 `[upstream] parse_error:<异常类型> <响应体>` 日志保留了区分线索。另外，如果 `content` 存在但为 `null` 或非字符串，代码没有非空/类型校验，会原样返回，页面可能显示空内容；所以这里的兜底只是“失败转 502”，不是“成功内容兜底”。
 
 ## 8. 异常处理与边界
 
