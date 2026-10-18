@@ -300,6 +300,8 @@ access-control-allow-origin: *
 
 这个配置是为本地演示放开的；如果以后部署到公网，应改成明确的前端来源白名单。
 
+注意 `allow_origins=["*"]` 与 `allow_credentials=True` 不能共存；将来页面需要登录态时，必须改成具体来源白名单。
+
 ### 消息滚动
 
 消息列表 `#msgList` 固定高度 `400px`，并设置 `overflow-y: auto`。无论是追加用户消息、机器人回复还是错误提示，代码都会在追加后执行：

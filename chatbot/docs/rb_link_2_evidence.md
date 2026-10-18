@@ -230,4 +230,6 @@ Console： []
 
 `allow_origins=["*"]` 仅用于本地 `file://` 演示。后续部署时应收紧为明确来源，例如只允许实际前端域名；本次按 rb_link_3 的结论不做代码修改。
 
+注意 `allow_origins=["*"]` 与 `allow_credentials=True` 不能共存，将来加登录态时必须改成具体来源白名单。
+
 当前仓库没有 `.github/workflows`，因此本次没有新增 GitHub Actions 工作流；运行证据以本文件和 `runtime-evidence.txt` 的原始输出为准。
