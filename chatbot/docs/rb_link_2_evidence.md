@@ -20,7 +20,8 @@ uvicorn main:app --port 8000
 实际启动日志：
 
 ```text
-INFO:     Started server process [23620]
+✅ DEEPSEEK_API_KEY 已配置（值已隐藏）
+INFO:     Started server process [30648]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
@@ -76,10 +77,10 @@ HTTP/1.1 503 Service Unavailable
 现在服务端还会为上游异常把诊断行写到 stderr，例如：
 
 ```text
-[upstream] 402 {"error":{"message":"Insufficient Balance","type":"insufficient_quota"}}
+[upstream] 401 {"error":{"message":"Authentication Fails, Your api key: **** is invalid",...}}
 ```
 
-响应体截断到 200 字符，不打印 `Authorization` 头或 API Key。写到 stderr 是为了与 uvicorn 的 INFO 日志走同一采集流，避免只抓 stderr 时漏掉上游原文。
+响应体截断到 200 字符，不打印 `Authorization` 头或 API Key；`Your api key: ...`、`api_key=...`、`Bearer ...` 和 `sk-...` 会先脱敏为 `****`。写到 stderr 是为了与 uvicorn 的 INFO 日志走同一采集流，避免只抓 stderr 时漏掉上游原文。
 
 ## 3. 按“后端端口 → 前端地址 → CORS”的三步定位
 

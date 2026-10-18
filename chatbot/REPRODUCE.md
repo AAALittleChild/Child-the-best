@@ -160,16 +160,17 @@ cd chatbot/houduan
 uvicorn main:app --port 8000
 ```
 
-终端实际输出：
+终端实际输出（最新一次重启，PID 会随运行变化）：
 
 ```text
-INFO:     Started server process [23620]
+✅ DEEPSEEK_API_KEY 已配置（值已隐藏）
+INFO:     Started server process [30648]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ```
 
-另开一个终端确认 8000 端口在监听：
+另开一个终端确认 8000 端口在监听（netstat 来自另一轮运行，PID 会变化）：
 
 ```powershell
 netstat -ano | findstr :8000
@@ -407,7 +408,7 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 所有上游异常都会在终端留下 `[upstream]` 行，例如：
 
 ```text
-[upstream] 401 {"error":{"message":"invalid key"}}
+[upstream] 401 {"error":{"message":"Authentication Fails, Your api key: **** is invalid",...}}
 ```
 
 - HTTP 状态错误：`[upstream] <status> <响应体前 200 字符，换行替换为空格>`
@@ -416,7 +417,7 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 - 响应解析失败：`[upstream] <status> parse_error:<异常类型> <响应体前 200 字符，换行替换为空格>`
 - 其他传输错误：`[upstream] http_error <异常文本>`
 
-日志只打印状态码和截断后的响应体，不打印 `Authorization` 头或 API Key。使用 `print(..., file=sys.stderr, flush=True)`，与 uvicorn 的 INFO 日志走同一个终端流，避免只采集 stderr 时漏掉。
+日志只打印状态码和截断后的响应体，不打印 `Authorization` 头或 API Key。响应体中的 `Your api key: ...`、`api_key=...`、`Bearer ...` 和 `sk-...` 会先脱敏为 `****`。使用 `print(..., file=sys.stderr, flush=True)`，与 uvicorn 的 INFO 日志走同一个终端流，避免只采集 stderr 时漏掉。
 
 仍需如实说明的边界：
 

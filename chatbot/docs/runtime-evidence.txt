@@ -17,6 +17,7 @@ Command:
 
 Terminal output (stderr):
 
+    ✅ DEEPSEEK_API_KEY 已配置（值已隐藏）
     INFO:     Started server process [23620]
     INFO:     Waiting for application startup.
     INFO:     Application startup complete.
@@ -230,3 +231,31 @@ A separate TestClient probe with a fake 401 also produced:
 
     [upstream] 401 {"error":{"message":"invalid key"}}
     HTTP 401 {'detail': '大模型服务鉴权失败（401）：DEEPSEEK_API_KEY 无效或已失效。'}
+
+============================================================
+G. Live wrong-key 401 verification (redacted)
+============================================================
+
+A deliberately wrong test key was used to force a real DeepSeek 401. The
+backend startup output was:
+
+    ✅ DEEPSEEK_API_KEY 已配置（值已隐藏）
+    INFO:     Started server process [30648]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+
+After opening the page and clicking 发送 with the message
+"验证错误Key（脱敏复测）", the page showed:
+
+    验证错误Key（脱敏复测）
+    请求失败：大模型服务鉴权失败（401）：DEEPSEEK_API_KEY 无效或已失效。
+
+The new terminal lines were:
+
+    [upstream] 401 {"error":{"message":"Authentication Fails, Your api key: **** is invalid (request_id: 2a344412-bc50-4535-a8b7-3447bbd500c4)","type":"authentication_error","param":null,"code":"invalid_request_error"}}
+    INFO:     127.0.0.1:56925 - "POST /chat HTTP/1.1" 401 Unauthorized
+
+The upstream response echoed a masked key suffix. The application's redaction
+replaced it with **** before writing to stderr; the log does not contain the
+request Authorization header or the full API key.

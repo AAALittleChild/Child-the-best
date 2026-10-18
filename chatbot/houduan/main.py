@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import re
 import sys
 from typing import Optional
 
@@ -13,6 +14,11 @@ from pydantic import BaseModel
 # 固定从 main.py 所在目录读取 .env，避免因启动目录不同而读不到 Key。
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 load_dotenv(ENV_PATH)
+
+if os.getenv("DEEPSEEK_API_KEY", "").strip():
+    print("✅ DEEPSEEK_API_KEY 已配置（值已隐藏）", file=sys.stderr, flush=True)
+else:
+    print("⚠️ DEEPSEEK_API_KEY 未配置", file=sys.stderr, flush=True)
 
 app = FastAPI(title="Chatbot API")
 
@@ -34,9 +40,24 @@ class ChatReq(BaseModel):
     message: str
 
 
+_REDACT_PATTERNS = (
+    (re.compile(r"(?i)(your\s+api\s+key\s*:\s*)[^\"\s,}]+"), r"\1****"),
+    (re.compile(r"(?i)(api[_\s-]?key\s*[:=]\s*)[^\"\s,}]+"), r"\1****"),
+    (re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._-]+"), r"\1****"),
+    (re.compile(r"sk-[A-Za-z0-9_-]{8,}"), "sk-****"),
+)
+
+
+def _redact_sensitive(text: object) -> str:
+    redacted = str(text)
+    for pattern, replacement in _REDACT_PATTERNS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
 def _log_upstream(status: object, text: object = "", kind: str = "") -> None:
     """Print one-line upstream diagnostics without copying into the HTTP reply."""
-    body = str(text)[:200].replace("\r", " ").replace("\n", " ")
+    body = _redact_sensitive(text)[:200].replace("\r", " ").replace("\n", " ")
     prefix = f"[upstream] {status}"
     if kind:
         prefix += f" {kind}"

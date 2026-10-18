@@ -61,7 +61,15 @@ def test_missing_key_returns_503(client, monkeypatch):
 
 def test_upstream_401_returns_readable_error(client, monkeypatch, capsys):
     async def fake_post(self, url, **kwargs):
-        return _fake_response(url, 401, {"error": {"message": "invalid key"}})
+        return _fake_response(
+            url,
+            401,
+            {
+                "error": {
+                    "message": "Authentication Fails, Your api key: sk-EXAMPLE-NOT-A-REAL-KEY is invalid"
+                }
+            },
+        )
 
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
@@ -72,7 +80,9 @@ def test_upstream_401_returns_readable_error(client, monkeypatch, capsys):
     assert "DEEPSEEK_API_KEY" in response.json()["detail"]
     log = capsys.readouterr().err
     assert "[upstream] 401" in log
-    assert "invalid key" in log
+    assert "Authentication Fails" in log
+    assert "Your api key: ****" in log
+    assert "sk-EXAMPLE-NOT-A-REAL-KEY" not in log
     assert "test-key-not-real" not in log
 
 
