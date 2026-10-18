@@ -297,3 +297,16 @@ There was no [upstream] error line on this success path. The backend executed
 res_data["choices"][0]["message"]["content"] and returned {"reply": ...}; the
 page rendered data.reply. The 401 path never reaches this extraction code, so
 this run is the success-path evidence rather than another authentication test.
+
+Success-path fallback boundary:
+
+- main.py:99 directly indexes res_data["choices"][0]["message"]["content"];
+  there is no .get(), default reply, retry, or backup model.
+- Missing/empty choices, missing message, or missing content -> main.py:128
+  catches KeyError/IndexError/TypeError/ValueError -> main.py:136 returns
+  HTTP 502 "大模型返回格式异常，未能解析出回复内容。"
+- If content exists but is null or non-string, there is no non-empty/type
+  validation; it is returned as-is and the page may render empty content.
+
+This success run proves the valid response shape works. It does not add a
+content-level fallback for a malformed successful response.

@@ -432,6 +432,8 @@ INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
 
 成功路径没有 `[upstream]` 错误行。后端实际执行了 `res_data["choices"][0]["message"]["content"]` 并把结果返回为 `{"reply": ...}`，前端再把它显示到页面，说明 `choices` 结构和 `content` 字段都能正常取值。Key 只从本机 `.env` 读入进程环境，没有出现在页面、终端或仓库中。
 
+成功路径的兜底边界：这段代码没有内容级兜底。`chatbot/houduan/main.py:99` 直接执行 `res_data["choices"][0]["message"]["content"]`，没有 `.get()`、默认回复、重试或备用模型；`choices` 缺失/为空、`message` 或 `content` 缺失时，由 `main.py:128` 的 `except (KeyError, IndexError, TypeError, ValueError)` 捕获，并返回 `main.py:136` 的 502「大模型返回格式异常」。如果 `content` 存在但为 `null` 或非字符串，代码没有非空/类型校验，会原样返回，页面可能显示空内容。因此这里的兜底只是“失败转 502”，不是“成功内容兜底”。
+
 ## 8. 异常处理与边界
 
 后端当前的错误映射如下，均为 JSON `{"detail": "..."}` 形式：
@@ -449,6 +451,8 @@ INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
 | 返回 JSON 无法解析或缺少字段 | 502 | 返回格式异常 |
 | 前端请求体不合法 | 422 | FastAPI 自动校验提示 |
 | 前端完全连不上本服务 | 无 HTTP 响应 | 页面显示“请求失败：后端服务未启动或网络连接异常” |
+
+补充：表中的 502 是失败兜底；成功路径本身没有内容兜底，详见 7.5。
 
 前端会先判断 `res.ok`：成功时显示 `data.reply`，失败时显示后端返回的 `data.detail`，不会再把错误响应当成正常回复显示成 `undefined`。
 
