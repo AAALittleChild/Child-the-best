@@ -27,7 +27,9 @@ INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ```
 
-端口确认：
+`✅` 只表示 `DEEPSEEK_API_KEY` 非空且已被读取，不校验 Key 有效性；有效性要到首次真实请求才会暴露（401 无效、402 余额不足）。
+
+端口确认（netstat 来自另一轮运行，PID 会变化）：
 
 ```text
 netstat -ano | findstr :8000
@@ -41,8 +43,9 @@ True
 
 - 后端聊天接口：`http://127.0.0.1:8000/chat`
 - FastAPI 文档：`http://127.0.0.1:8000/docs`，实测返回 `200`
-- 前端页面：双击 `chatbot/qinduan/index.html`，即 `file:///.../chatbot/qinduan/index.html`
-- 端到端浏览器测试时，同一份页面通过 `python -m http.server 8080 --directory chatbot/qinduan` 打开为 `http://127.0.0.1:8080/index.html`；页面代码没有变化
+- 方式 A（日常使用）：双击 `chatbot/qinduan/index.html`，即 `file:///.../chatbot/qinduan/index.html`
+- 方式 B（本次页面实测）：`python -m http.server 8080 --directory chatbot/qinduan`，打开 `http://127.0.0.1:8080/index.html`；页面代码没有变化
+- 两种方式都由 `allow_origins=["*"]` 放行；方式 A 的 `Origin: null` 已用 curl 预检单独验证
 
 ## 2. 遇到的报错原文
 
@@ -164,6 +167,30 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 这条回复来自真实 DeepSeek，经 `POST http://127.0.0.1:8000/chat` 返回，不是本地桩上游。
 
 Key 只从本机 `.env` 读入进程环境，没有写入仓库、证据文件或提交记录。测试使用的是当前仓库已修复的 `main.py`，不是旧版本副本。
+
+### 4.1 页面成功路径（真实 DeepSeek）
+
+这一节不是 401 错误分支，而是页面实际收到机器人回答的成功路径。使用方式 B 打开同一份 `index.html`，输入并发送：
+
+```text
+请用一句话介绍你自己
+```
+
+页面实际显示：
+
+```text
+请用一句话介绍你自己
+我是DeepSeek，由深度求索公司创造的AI助手，致力于用热情细腻的方式帮助你探索世界、解决问题。
+```
+
+后端终端新增：
+
+```text
+INFO:     127.0.0.1:51929 - "OPTIONS /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
+```
+
+成功路径没有 `[upstream]` 错误行。后端执行了 `res_data["choices"][0]["message"]["content"]`，返回 `{"reply": ...}`，前端再显示 `data.reply`；401 分支不会走到这段取值代码。
 
 ## 5. 测试与最终页面状态
 

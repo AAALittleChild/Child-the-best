@@ -23,6 +23,10 @@ Terminal output (stderr):
     INFO:     Application startup complete.
     INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
+The ✅ line only means DEEPSEEK_API_KEY is non-empty and was loaded. It does
+not validate the key; validity is revealed on the first real request (401 for
+invalid key, 402 for insufficient balance).
+
 Port check:
 
     netstat -ano | findstr :8000
@@ -259,3 +263,37 @@ The new terminal lines were:
 The upstream response echoed a masked key suffix. The application's redaction
 replaced it with **** before writing to stderr; the log does not contain the
 request Authorization header or the full API key.
+
+============================================================
+H. Page success path (real DeepSeek)
+============================================================
+
+Access method used for this run:
+
+    python -m http.server 8080 --directory chatbot/qinduan
+    http://127.0.0.1:8080/index.html
+
+This is the same index.html as the file:// workflow; only the origin differs.
+
+Backend startup:
+
+    ✅ DEEPSEEK_API_KEY 已配置（值已隐藏）
+    INFO:     Started server process [22600]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+
+Page after sending "请用一句话介绍你自己":
+
+    请用一句话介绍你自己
+    我是DeepSeek，由深度求索公司创造的AI助手，致力于用热情细腻的方式帮助你探索世界、解决问题。
+
+Backend access log:
+
+    INFO:     127.0.0.1:51929 - "OPTIONS /chat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
+
+There was no [upstream] error line on this success path. The backend executed
+res_data["choices"][0]["message"]["content"] and returned {"reply": ...}; the
+page rendered data.reply. The 401 path never reaches this extraction code, so
+this run is the success-path evidence rather than another authentication test.

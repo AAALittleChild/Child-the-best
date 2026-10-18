@@ -170,6 +170,8 @@ INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ```
 
+`✅` 只表示 `DEEPSEEK_API_KEY` 非空且已被读取，**不校验 Key 是否有效**。Key 是否有效要到首次真实请求才会暴露：401 表示 Key 无效或已失效，402 表示账户余额不足。
+
 另开一个终端确认 8000 端口在监听（netstat 来自另一轮运行，PID 会变化）：
 
 ```powershell
@@ -252,11 +254,26 @@ access-control-allow-origin: *
    - 页面显示：`本地桩回复：收到「恢复测试」`
    - 页面恢复显示回复，说明 `/chat` 请求已成功
 
-这个记录证明了页面能发出真实 HTTP 请求、后端能接收并转发、前端能解析并显示回复，且后端不可用时前端有可读提示。真实 DeepSeek 回复仍需配置真实 Key 后运行 `check_real_chat.py` 或 `check_deepseek_live.py`。
+这个记录证明了页面能发出真实 HTTP 请求、后端能接收并转发、前端能解析并显示回复，且后端不可用时前端有可读提示。真实 DeepSeek 的成功回复已在 7.5 节通过页面实测。
 
 ## 6. 打开前端
 
 直接双击打开 `chatbot/qinduan/index.html`，浏览器地址栏是 `file:///.../index.html`。不需要另起前端服务器。
+
+### 6.1 两种打开方式
+
+两种方式打开的是同一份 `chatbot/qinduan/index.html`，`CHAT_API` 也相同：
+
+- **方式 A（日常使用）**：直接双击 `index.html`，地址是 `file:///.../index.html`。浏览器发送的 `Origin` 是 `null`，由后端 `allow_origins=["*"]` 放行。
+- **方式 B（自动化验证）**：
+
+  ```powershell
+  python -m http.server 8080 --directory chatbot/qinduan
+  ```
+
+  然后打开 `http://127.0.0.1:8080/index.html`。`Origin` 是 `http://127.0.0.1:8080`，同样被 `allow_origins=["*"]` 放行。
+
+本文 5.2 和 7.5 的页面实测使用方式 B，因为便于自动读取页面文字；方式 A 的 `Origin: null` 预检已用 curl 单独验证（见下文）。两种方式任选一种即可复现，不要把方式 B 的地址误写成 `file://`。
 
 前端请求地址是硬编码的，集中在 `index.html` 的这一行：
 
@@ -382,6 +399,36 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 完整评审版（含启动、访问地址、报错原文和三步定位）见 [chatbot/docs/rb_link_2_evidence.md](docs/rb_link_2_evidence.md)。
 
 若没有配置 Key，脚本会直接退出并提示先配置 `DEEPSEEK_API_KEY`，不会发出真实请求。
+
+### 7.5 页面成功路径实测（真实 DeepSeek）
+
+这一节验证的是成功路径，不是 401 错误分支。启动当前仓库版后端并使用真实 Key 后，用方式 B 打开页面：
+
+```powershell
+python -m http.server 8080 --directory chatbot/qinduan
+```
+
+页面发送：
+
+```text
+请用一句话介绍你自己
+```
+
+页面实际显示：
+
+```text
+请用一句话介绍你自己
+我是DeepSeek，由深度求索公司创造的AI助手，致力于用热情细腻的方式帮助你探索世界、解决问题。
+```
+
+后端终端新增：
+
+```text
+INFO:     127.0.0.1:51929 - "OPTIONS /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
+```
+
+成功路径没有 `[upstream]` 错误行。后端实际执行了 `res_data["choices"][0]["message"]["content"]` 并把结果返回为 `{"reply": ...}`，前端再把它显示到页面，说明 `choices` 结构和 `content` 字段都能正常取值。Key 只从本机 `.env` 读入进程环境，没有出现在页面、终端或仓库中。
 
 ## 8. 异常处理与边界
 
