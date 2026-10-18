@@ -5,3 +5,4 @@
 - 本地复现说明：[chatbot/REPRODUCE.md](chatbot/REPRODUCE.md)
 - rb_link_2 运行与排查证据：[chatbot/docs/rb_link_2_evidence.md](chatbot/docs/rb_link_2_evidence.md)
 - 原始运行文本证据：[chatbot/docs/runtime-evidence.txt](chatbot/docs/runtime-evidence.txt)
+- 完整 pytest 运行输出：[PYTEST_RUN.txt](PYTEST_RUN.txt)
