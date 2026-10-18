@@ -7,3 +7,4 @@
 - rb_link_2 运行与排查证据：[chatbot/docs/rb_link_2_evidence.md](chatbot/docs/rb_link_2_evidence.md)
 - 原始运行文本证据：[chatbot/docs/runtime-evidence.txt](chatbot/docs/runtime-evidence.txt)
 - 完整 pytest 运行输出：[PYTEST_RUN.txt](PYTEST_RUN.txt)
+- 数据流说明：[chatbot/docs/data_flow_description.md](chatbot/docs/data_flow_description.md)
