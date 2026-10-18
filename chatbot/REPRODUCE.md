@@ -415,30 +415,65 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 
 ### 7.5 页面成功路径实测（真实 DeepSeek）
 
-这一节验证的是成功路径，不是 401 错误分支。启动当前仓库版后端并使用真实 Key 后，用方式 B 打开页面：
+这一节验证的是成功路径，不是 401 错误分支。下面的联调固定使用 HTTP 方式，**不是 `file://`**。
+
+#### 7.5.1 启动后端
+
+```powershell
+cd chatbot/houduan
+copy .env.example .env
+# 编辑 .env，填入 DEEPSEEK_API_KEY=sk-...
+uvicorn main:app --port 8000
+```
+
+预期启动日志：
+
+```text
+✅ DEEPSEEK_API_KEY 已配置（值已隐藏）
+INFO:     Started server process [...]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+`✅` 只表示 Key 非空，不代表有效；有效性在首次真实请求时验证。
+
+#### 7.5.2 启动页面服务并访问
+
+在仓库根目录另开一个终端：
 
 ```powershell
 python -m http.server 8080 --directory chatbot/qinduan
 ```
 
-页面发送：
+浏览器打开：
+
+```text
+http://127.0.0.1:8080/index.html
+```
+
+这次联调不要双击 `index.html` 用 `file://`。打开的是同一份页面，但本次的 `Origin` 是 `http://127.0.0.1:8080`，由后端 `allow_origins=["*"]` 放行。
+
+#### 7.5.3 发送消息与预期现象
+
+页面输入并发送：
 
 ```text
 请用一句话介绍你自己
 ```
 
-页面实际显示：
+预期页面出现用户消息和一条机器人回复；本次实测显示：
 
 ```text
 请用一句话介绍你自己
 我是DeepSeek，由深度求索公司创造的AI助手，致力于用热情细腻的方式帮助你探索世界、解决问题。
 ```
 
-后端终端新增：
+预期后端终端新增（客户端端口号会变化）：
 
 ```text
-INFO:     127.0.0.1:51929 - "OPTIONS /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:<client-port> - "OPTIONS /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:<client-port> - "POST /chat HTTP/1.1" 200 OK
 ```
 
 成功路径没有 `[upstream]` 错误行。后端实际执行了 `res_data["choices"][0]["message"]["content"]` 并把结果返回为 `{"reply": ...}`，前端再把它显示到页面，说明 `choices` 结构和 `content` 字段都能正常取值。Key 只从本机 `.env` 读入进程环境，没有出现在页面、终端或仓库中。
