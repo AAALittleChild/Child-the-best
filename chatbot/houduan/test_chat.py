@@ -125,6 +125,8 @@ def test_upstream_402_returns_readable_error(client, monkeypatch, capsys):
     log = capsys.readouterr().err
     assert "[upstream] 402" in log
     assert "Insufficient Balance" in log
+    assert "test-key-not-real" not in log
+    assert "Authorization" not in log
 
 
 def test_timeout_returns_504(client, monkeypatch, capsys):
