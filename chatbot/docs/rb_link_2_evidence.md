@@ -87,6 +87,34 @@ HTTP/1.1 503 Service Unavailable
 
 响应体截断到 200 字符，不打印 `Authorization` 头或 API Key；`Your api key: ...`、`api_key=...`、`Bearer ...` 和 `sk-...` 会先脱敏为 `****`。写到 stderr 是为了与 uvicorn 的 INFO 日志走同一采集流，避免只抓 stderr 时漏掉上游原文。
 
+### 2.1 空 Key 的 503 分支实测
+
+前置条件：仓库无 `.env`，当前进程环境无 `DEEPSEEK_API_KEY`，启动全新 uvicorn 进程。启动输出：
+
+```text
+⚠️ DEEPSEEK_API_KEY 未配置
+INFO:     Started server process [32140]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+页面发送 `空Key分支验证` 后显示：
+
+```text
+空Key分支验证
+请求失败：后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。
+```
+
+后端访问日志：
+
+```text
+INFO:     127.0.0.1:60541 - "OPTIONS /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60541 - "POST /chat HTTP/1.1" 503 Service Unavailable
+```
+
+没有 `[upstream]` 行，因为 `_get_api_key()` 在发出上游请求前就抛了 503。`load_dotenv(ENV_PATH)` 只在模块导入时执行；修改 `.env` 后必须重启 uvicorn，否则旧进程可能仍持有旧 Key。
+
 ## 3. 按“后端端口 → 前端地址 → CORS”的三步定位
 
 ### 第一步：后端端口是否在监听

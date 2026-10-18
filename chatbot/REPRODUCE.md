@@ -517,6 +517,8 @@ INFO:     127.0.0.1:<client-port> - "POST /chat HTTP/1.1" 200 OK
 
 补充：表中的 502 是失败兜底；成功路径本身没有内容兜底，详见 7.5。
 
+空 Key 分支实测：全新 uvicorn 进程、无 `.env`、环境无 `DEEPSEEK_API_KEY` 时，启动打印 `⚠️ DEEPSEEK_API_KEY 未配置`；页面发送后显示 503 的可读 `detail`，终端为 `OPTIONS 200` + `POST 503`，不会出现 `[upstream]`。注意 `load_dotenv(ENV_PATH)` 只在模块导入时执行，改了 `.env` 必须重启 uvicorn，否则旧进程仍可能持有旧 Key。
+
 前端会先判断 `res.ok`：成功时显示 `data.reply`，失败时显示后端返回的 `data.detail`，不会再把错误响应当成正常回复显示成 `undefined`。
 
 ### 服务端上游日志

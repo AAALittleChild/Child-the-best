@@ -345,3 +345,33 @@ After scrolling down in the message area:
 This confirms the message list is scrollable, the latest message is pinned to
 the bottom after appending, and the user can scroll up and back down. The test
 used a local stub upstream and only exercises frontend scrolling.
+
+============================================================
+J. Empty-key 503 branch (fresh process)
+============================================================
+
+Preconditions: no chatbot/houduan/.env, no DEEPSEEK_API_KEY in the process
+environment, and a freshly started uvicorn process.
+
+Startup:
+
+    ⚠️ DEEPSEEK_API_KEY 未配置
+    INFO:     Started server process [32140]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+
+Page after sending "空Key分支验证":
+
+    空Key分支验证
+    请求失败：后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。
+
+Backend access log:
+
+    INFO:     127.0.0.1:60541 - "OPTIONS /chat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:60541 - "POST /chat HTTP/1.1" 503 Service Unavailable
+
+There was no [upstream] line because _get_api_key() raised 503 before any
+outbound request. load_dotenv(ENV_PATH) runs only at module import time, so
+changing .env requires restarting uvicorn; otherwise the old process may still
+hold the previous key.
