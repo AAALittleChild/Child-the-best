@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
@@ -32,6 +33,15 @@ class ChatReq(BaseModel):
     message: str
 
 
+def _log_upstream(status: object, text: object = "", kind: str = "") -> None:
+    """Print one-line upstream diagnostics without copying into the HTTP reply."""
+    body = str(text)[:200].replace("\r", " ").replace("\n", " ")
+    prefix = f"[upstream] {status}"
+    if kind:
+        prefix += f" {kind}"
+    print(f"{prefix} {body}".rstrip(), flush=True)
+
+
 def _get_api_key() -> str:
     api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
@@ -54,6 +64,7 @@ async def chat(req: ChatReq):
         "messages": [{"role": "user", "content": req.message}],
     }
 
+    resp: Optional[httpx.Response] = None
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
             resp = await client.post(
@@ -65,17 +76,20 @@ async def chat(req: ChatReq):
             res_data = resp.json()
         answer = res_data["choices"][0]["message"]["content"]
     except httpx.TimeoutException as exc:
+        _log_upstream("timeout", exc)
         raise HTTPException(
             status_code=504,
             detail=f"调用大模型超时（{TIMEOUT_SECONDS} 秒），请稍后重试。",
         ) from exc
     except httpx.ConnectError as exc:
+        _log_upstream("connect_error", exc)
         raise HTTPException(
             status_code=503,
             detail="无法连接大模型服务，请检查本机网络或代理设置。",
         ) from exc
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
+        _log_upstream(status, exc.response.text)
         if status == 401:
             detail = "大模型服务鉴权失败（401）：DEEPSEEK_API_KEY 无效或已失效。"
         elif status == 402:
@@ -90,11 +104,17 @@ async def chat(req: ChatReq):
         client_status = status if 400 <= status < 500 else 502
         raise HTTPException(status_code=client_status, detail=detail) from exc
     except (KeyError, IndexError, TypeError, ValueError) as exc:
+        _log_upstream(
+            getattr(resp, "status_code", "unknown"),
+            getattr(resp, "text", ""),
+            f"parse_error:{type(exc).__name__}",
+        )
         raise HTTPException(
             status_code=502,
             detail="大模型返回格式异常，未能解析出回复内容。",
         ) from exc
     except httpx.HTTPError as exc:
+        _log_upstream("http_error", exc)
         raise HTTPException(
             status_code=502,
             detail="调用大模型服务失败，请稍后重试。",

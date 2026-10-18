@@ -196,3 +196,17 @@ Browser console entries:
 
 This confirms that the final page still sends the request, reads the JSON
 detail on a non-2xx response, renders it, and no longer emits A/B/C debug logs.
+
+============================================================
+F. Upstream error log verification
+============================================================
+
+After adding the [upstream] log, a temporary TestClient probe with a fake 401
+response produced:
+
+    [upstream] 401 {"error":{"message":"invalid key"}}
+    HTTP 401 {'detail': '大模型服务鉴权失败（401）：DEEPSEEK_API_KEY 无效或已失效。'}
+
+The probe was removed after capture. The log contains the upstream status and
+the response body truncated to 200 characters; it does not contain the
+Authorization header or the API key.

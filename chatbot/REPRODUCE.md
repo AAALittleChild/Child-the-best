@@ -402,6 +402,22 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 
 前端会先判断 `res.ok`：成功时显示 `data.reply`，失败时显示后端返回的 `data.detail`，不会再把错误响应当成正常回复显示成 `undefined`。
 
+### 服务端上游日志
+
+所有上游异常都会在终端留下 `[upstream]` 行，例如：
+
+```text
+[upstream] 401 {"error":{"message":"invalid key"}}
+```
+
+- HTTP 状态错误：`[upstream] <status> <响应体前 200 字符，换行替换为空格>`
+- 超时：`[upstream] timeout <异常文本>`
+- 连接失败：`[upstream] connect_error <异常文本>`
+- 响应解析失败：`[upstream] <status> parse_error:<异常类型> <响应体前 200 字符，换行替换为空格>`
+- 其他传输错误：`[upstream] http_error <异常文本>`
+
+日志只打印状态码和截断后的响应体，不打印 `Authorization` 头或 API Key。使用 `print(..., flush=True)`，在 uvicorn 终端立即可见。
+
 仍需如实说明的边界：
 
 - 没有自动重试；超时或上游 5xx 需要用户手动重发。

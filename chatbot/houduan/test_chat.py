@@ -59,7 +59,7 @@ def test_missing_key_returns_503(client, monkeypatch):
     assert "DEEPSEEK_API_KEY" in response.json()["detail"]
 
 
-def test_upstream_401_returns_readable_error(client, monkeypatch):
+def test_upstream_401_returns_readable_error(client, monkeypatch, capsys):
     async def fake_post(self, url, **kwargs):
         return _fake_response(url, 401, {"error": {"message": "invalid key"}})
 
@@ -70,9 +70,13 @@ def test_upstream_401_returns_readable_error(client, monkeypatch):
     assert response.status_code == 401
     assert "401" in response.json()["detail"]
     assert "DEEPSEEK_API_KEY" in response.json()["detail"]
+    log = capsys.readouterr().out
+    assert "[upstream] 401" in log
+    assert "invalid key" in log
+    assert "test-key-not-real" not in log
 
 
-def test_upstream_5xx_returns_502(client, monkeypatch):
+def test_upstream_5xx_returns_502(client, monkeypatch, capsys):
     async def fake_post(self, url, **kwargs):
         return _fake_response(url, 503, {"error": {"message": "unavailable"}})
 
@@ -82,9 +86,12 @@ def test_upstream_5xx_returns_502(client, monkeypatch):
 
     assert response.status_code == 502
     assert "503" in response.json()["detail"]
+    log = capsys.readouterr().out
+    assert "[upstream] 503" in log
+    assert "unavailable" in log
 
 
-def test_timeout_returns_504(client, monkeypatch):
+def test_timeout_returns_504(client, monkeypatch, capsys):
     async def fake_post(self, url, **kwargs):
         raise httpx.ReadTimeout("timed out", request=httpx.Request("POST", url))
 
@@ -94,9 +101,10 @@ def test_timeout_returns_504(client, monkeypatch):
 
     assert response.status_code == 504
     assert "超时" in response.json()["detail"]
+    assert "[upstream] timeout" in capsys.readouterr().out
 
 
-def test_connect_error_returns_503(client, monkeypatch):
+def test_connect_error_returns_503(client, monkeypatch, capsys):
     async def fake_post(self, url, **kwargs):
         raise httpx.ConnectError(
             "connection refused",
@@ -109,9 +117,10 @@ def test_connect_error_returns_503(client, monkeypatch):
 
     assert response.status_code == 503
     assert "无法连接" in response.json()["detail"]
+    assert "[upstream] connect_error" in capsys.readouterr().out
 
 
-def test_malformed_upstream_payload_returns_502(client, monkeypatch):
+def test_malformed_upstream_payload_returns_502(client, monkeypatch, capsys):
     async def fake_post(self, url, **kwargs):
         return _fake_response(url, 200, {"unexpected": "shape"})
 
@@ -121,6 +130,9 @@ def test_malformed_upstream_payload_returns_502(client, monkeypatch):
 
     assert response.status_code == 502
     assert "格式异常" in response.json()["detail"]
+    log = capsys.readouterr().out
+    assert "[upstream] 200 parse_error:KeyError" in log
+    assert "unexpected" in log
 
 
 def test_cors_allows_file_origin_null(client):

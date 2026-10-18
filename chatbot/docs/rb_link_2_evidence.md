@@ -73,6 +73,8 @@ HTTP/1.1 503 Service Unavailable
 {"detail":"后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。"}
 ```
 
+现在服务端还会为上游异常打印诊断行，例如 `[upstream] 401 {"error":{"message":"invalid key"}}`。响应体截断到 200 字符，不打印 `Authorization` 头或 API Key。
+
 ## 3. 按“后端端口 → 前端地址 → CORS”的三步定位
 
 ### 第一步：后端端口是否在监听
