@@ -22,6 +22,8 @@
         const msgList = document.getElementById('msgList');
         const msgInput = document.getElementById('msgInput');
         const sendBtn = document.getElementById('sendBtn');
+        // 后端地址：换机器或改端口时只需同步修改这一行。
+        const CHAT_API = 'http://127.0.0.1:8000/chat';
 
         sendBtn.addEventListener('click', async () => {
             const userText = msgInput.value.trim();
@@ -35,7 +37,7 @@
 
             try {
                 console.log("标记A：即将执行fetch");
-                const res = await fetch('http://127.0.0.1:8000/chat', {
+                const res = await fetch(CHAT_API, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -47,13 +49,15 @@
                 console.log("标记C：json解析完成");
 
                 const botDiv = document.createElement('div');
-                botDiv.textContent = data.reply;
+                botDiv.textContent = res.ok
+                    ? data.reply
+                    : `请求失败：${data.detail || res.status}`;
                 msgList.appendChild(botDiv);
                 msgList.scrollTop = msgList.scrollHeight;
             } catch (err) {
                 console.error("请求捕获异常：", err);
                 const errDiv = document.createElement('div');
-                errDiv.textContent = "请求失败：后端服务未启动或连接异常";
+                errDiv.textContent = "请求失败：后端服务未启动或网络连接异常";
                 msgList.appendChild(errDiv);
                 msgList.scrollTop = msgList.scrollHeight;
             }

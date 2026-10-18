@@ -1,0 +1,16 @@
+# 真实密钥只放在本地，不进入版本库
+.env
+.env.*
+!.env.example
+
+# Python 运行时产物
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 编辑器/系统垃圾
+.DS_Store
+.idea/
+.vscode/

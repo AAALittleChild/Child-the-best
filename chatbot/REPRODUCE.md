@@ -1,109 +1,281 @@
-\# 本地复现步骤文档
+# 聊天机器人本地复现与验收说明
 
-\## 前置条件
+本文按仓库的真实目录和真实代码编写。复现路径、启动命令、测试性质、错误边界和前端行为都以当前代码为准。
 
-1\. 本机已安装 Python 3.9 及以上版本
+## 1. 实际目录结构
 
-2\. 可以正常访问大模型API接口
+```text
+Child-the-best/
+└─ chatbot/
+   ├─ houduan/                  # 后端，启动目录
+   │  ├─ main.py                # FastAPI 应用
+   │  ├─ test_chat.py           # pytest 离线接口测试
+   │  ├─ check_deepseek_live.py # 手动真实联调脚本（不参与 pytest）
+   │  ├─ requirements.txt
+   │  ├─ .env.example           # 变量名占位模板，可提交
+   │  └─ .env                   # 本地真实 Key，不提交
+   ├─ qinduan/
+   │  └─ index.html             # 前端页面，用 file:// 直接打开
+   └─ REPRODUCE.md
+```
 
-3\. 准备好可用的 API Key
+注意：后端代码在 `chatbot/houduan`，前端代码在 `chatbot/qinduan`，不是把 `main.py` 和 `index.html` 放在同一个目录。
 
-> Evidence tag: runtime, description
-### main.py 代码逻辑说明
-1. **接收请求部分：ChatReq 模型 和 /chat 接口**
-使用 pydantic 的 ChatReq 数据模型定义请求体结构，里面包含 message 字段。`@app.post("/chat")` 装饰器注册 POST 接口，当前端发送POST请求到 /chat，FastAPI 会自动把前端传来的 json 数据校验、解析为 ChatReq 对象，拿到里面的 message。
+## 2. 前置条件
 
-2. **转发到 DeepSeek 接口：headers、payload、httpx**
-构造请求头 headers，携带 Authorization 鉴权信息（从环境变量读取 API_KEY）；payload 按照 DeepSeek 接口规范组装模型参数，把上一步拿到的用户 message 放进对话消息列表。使用 httpx 客户端发起 POST 请求，将 payload 发送给 DeepSeek 的 `/v1/chat/completions` 大模型接口，等待大模型返回结果。
+1. Python 3.9 及以上。
+2. 仅“真实调用大模型”和 `check_deepseek_live.py` 需要可用的 DeepSeek API Key 与外网；`pytest` 离线测试不需要。
 
-3. **解析响应并返回**
-拿到 DeepSeek 返回的响应 json 数据 res_data，读取 `res_data["choices"][0]["message"]["content"]`，这一段就是大模型生成的回答内容。最后包装成 `{"reply": 回答文本}` 的字典，作为接口返回值给到前端页面。
+## 3. 配置 API Key
 
-补充运行证据：启动命令 `uvicorn main:app --reload --host 0.0.0.0 --port 8000`，启动成功后控制台输出服务监听日志，访问 http://127.0.0.1:8000/docs 可以打开 FastAPI 自动接口文档页面，验证接口可访问。
+`.env` 必须放在 `chatbot/houduan/`，与 `main.py` 同级。`main.py` 使用下面的方式显式读取该文件，因此不依赖启动时的工作目录：
 
-\## 步骤1：拉取/拿到项目代码
+```python
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH)
+```
 
-将项目文件夹 `chatbot` 放到本地，目录结构：
+Windows 下复制模板：
 
-chatbot/
+```powershell
+cd chatbot/houduan
+copy .env.example .env
+```
 
-├─ main.py
-
-├─ index.html
-
-├─ .gitignore
-
-└─ REPRODUCE.md
-
-
-
-\## 步骤2：配置环境变量密钥
-
-1\. 在 chatbot 文件夹内新建文件 `.env`
-
-2\. 在 `.env` 写入内容：
-
-DEEPSEEK\_API\_KEY = 在此处填入你的 key
-
-> .env 文件已经在 .gitignore 中配置，不会上传至代码仓库
-
-
-
-\## 步骤3：安装项目依赖
-
-打开终端，cd 进入 chatbot 目录，执行：
+macOS / Linux：
 
 ```bash
+cd chatbot/houduan
+cp .env.example .env
+```
 
-pip install fastapi uvicorn httpx python-dotenv
+然后编辑 `.env`，只保留一个变量：
 
-步骤 4：启动后端服务
+```dotenv
+DEEPSEEK_API_KEY=sk-你的真实Key
+```
 
-终端执行启动命令：
+`.env.example` 里只有占位值 `sk-your-deepseek-api-key`，不含真实 Key。
 
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+### Key 未泄露的自证
 
-✅ 正常启动成功标志（控制台输出）：
+仓库根目录的 `.gitignore` 已包含 `.env`，并显式放行 `.env.example`：
 
-INFO:     Started server process \[xxxx]
+```text
+.env
+.env.*
+!.env.example
+```
 
-INFO:     Waiting for application startup.
+可用以下命令核对：
 
-✅ API\_KEY读取成功
+```powershell
+git ls-files | findstr /i ".env"
+git check-ignore -v chatbot/houduan/.env
+git check-ignore -q --no-index chatbot/houduan/.env.example
+Write-Output "EXAMPLE_IGNORED_EXIT=$LASTEXITCODE"
+```
 
-INFO:     Application startup complete.
+实际结果：
 
+- `git ls-files` 中没有任何 `.env` 文件，只有 `chatbot/houduan/.env.example`。
+- `git check-ignore -v chatbot/houduan/.env` 输出 `.gitignore:2:.env`，说明真实 `.env` 被忽略。
+- `.env.example` 的忽略检查输出 `EXAMPLE_IGNORED_EXIT=1`，说明它没有被忽略，会正常进入版本库。
+
+同时，仓库中误提交的 `chatbot/houduan/__pycache__/` 已从 Git 索引移除，并加入 `.gitignore`。
+
+## 4. 安装依赖
+
+```powershell
+cd chatbot/houduan
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -r requirements.txt
+```
+
+macOS / Linux 的激活命令为 `source .venv/bin/activate`。
+
+## 5. 启动后端
+
+必须先进入 `chatbot/houduan`，再执行：
+
+```powershell
+uvicorn main:app --port 8000
+```
+
+需要改代码后自动重载时，可加 `--reload`：
+
+```powershell
+uvicorn main:app --reload --port 8000
+```
+
+正常启动后，终端会显示类似：
+
+```text
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
 
-步骤 5：打开前端页面进行交互
+验证服务真的在监听（不是进程内测试）：
 
-直接双击打开 index.html
+```powershell
+Invoke-WebRequest -Uri http://127.0.0.1:8000/docs -UseBasicParsing
+```
 
-在网页输入框输入消息，点击发送
+预期 HTTP 200，并能在浏览器打开 FastAPI 的 `/docs` 页面。
 
-前端会 POST 请求 http://127.0.0.1:8000/chat
+也可以在服务启动后发一次真实请求：
 
-后端调用大模型接口，返回回答展示在页面
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8000/chat `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body '{"message":"你好"}'
+```
 
-步骤 6：排查验证（对应评审证据）
+成功时返回：
 
-验证后端端口监听：访问 http://127.0.0.1:8000/docs 可以打开 FastAPI 接口文档
+```json
+{"reply": "大模型生成的回答"}
+```
 
-验证前端请求：浏览器按 F12 打开开发者工具 → Network，查看 /chat 请求
+## 6. 打开前端
 
-成功：Status 200，可看到请求体与 reply 返回内容
+直接双击打开 `chatbot/qinduan/index.html`，浏览器地址栏是 `file:///.../index.html`。不需要另起前端服务器。
 
-验证控制台标记日志：切换到 Console，查看 A/B/C 标记输出
+前端请求地址是硬编码的，集中在 `index.html` 的这一行：
 
-正常连通：标记 A → 标记 B → 标记 C
+```javascript
+const CHAT_API = 'http://127.0.0.1:8000/chat';
+```
 
-后端未启动：仅标记 A，抛出 Failed to fetch 跨域 / 连接错误
+**换机器或改后端端口时，要同步修改这一行。** 页面本身不读取环境变量，也不会自动发现新地址。
 
-CORS：后端已配置跨域中间件，本地直接打开 html 不会拦截
+### 为什么 `file://` 能访问后端
 
-终止服务
+从 `file://` 打开页面时，浏览器发出的 `Origin` 是 `null`。后端当前配置为：
 
-在启动后端的终端按下 Ctrl + C，停止 uvicorn 服务
+```python
+allow_origins=["*"]
+```
 
+因此预检请求会放行。实测 `OPTIONS /chat` 带 `Origin: null` 时返回：
 
+```text
+HTTP/1.1 200 OK
+access-control-allow-origin: *
+```
 
+这个配置是为本地演示放开的；如果以后部署到公网，应改成明确的前端来源白名单。
+
+### 消息滚动
+
+消息列表 `#msgList` 固定高度 `400px`，并设置 `overflow-y: auto`。无论是追加用户消息、机器人回复还是错误提示，代码都会在追加后执行：
+
+```javascript
+msgList.scrollTop = msgList.scrollHeight;
+```
+
+因此消息变多后可以上下滚动，最新一条始终贴底。
+
+## 7. 测试说明与证据
+
+### 7.1 `test_chat.py` 是什么测试
+
+`test_chat.py` 使用 `fastapi.testclient.TestClient`，是**进程内测试**：
+
+- 不监听 `127.0.0.1:8000`，不经过真实网络端口；
+- 不使用真实 `DEEPSEEK_API_KEY`；
+- 不访问 DeepSeek。测试通过 `pytest` 的 `monkeypatch` 把 `httpx.AsyncClient.post` 替换为本地假函数，返回构造好的 DeepSeek 响应；
+- 覆盖成功回复、缺少 Key、上游 401、上游 5xx、超时、连接失败、返回格式异常，以及 `file://` 的 `Origin: null` 预检，共 8 项。
+
+它证明的是：路由、请求体校验、转发给 DeepSeek 的 URL/Header/模型参数、响应解析和错误映射的逻辑正确。它**不能**证明 8000 端口真的在监听；后者由第 5 节的 uvicorn + `/docs` 验证。
+
+运行方式：
+
+```powershell
+cd chatbot/houduan
+python -m pytest -v
+```
+
+实际结果：
+
+```text
+collected 8 items
+test_chat.py::test_chat_interface PASSED
+test_chat.py::test_missing_key_returns_503 PASSED
+test_chat.py::test_upstream_401_returns_readable_error PASSED
+test_chat.py::test_upstream_5xx_returns_502 PASSED
+test_chat.py::test_timeout_returns_504 PASSED
+test_chat.py::test_connect_error_returns_503 PASSED
+test_chat.py::test_malformed_upstream_payload_returns_502 PASSED
+test_chat.py::test_cors_allows_file_origin_null PASSED
+8 passed
+```
+
+### 7.2 真实联调脚本
+
+`check_deepseek_live.py` 是手动脚本，不是 pytest 用例。它会真实访问 DeepSeek，需要有效 Key 和网络：
+
+```powershell
+cd chatbot/houduan
+python check_deepseek_live.py
+```
+
+它被单独命名并放在 `if __name__ == "__main__":` 保护下，因此运行 `pytest` 时不会被收集，也不会偷偷发起真实请求。
+
+### 7.3 真实监听与无 Key 错误提示的实测
+
+启动 uvicorn 后实测：
+
+```text
+GET  /docs  -> 200
+POST /chat  -> 503
+{"detail":"后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。"}
+```
+
+这说明端口确实在监听，且缺少 Key 时返回的是可读 JSON，而不是 500 堆栈。
+
+## 8. 异常处理与边界
+
+后端当前的错误映射如下，均为 JSON `{"detail": "..."}` 形式：
+
+| 场景 | HTTP 状态码 | 提示内容 |
+| --- | --- | --- |
+| 本地未配置 `DEEPSEEK_API_KEY` | 503 | 提示在 `chatbot/houduan/.env` 中填写 |
+| DeepSeek 返回 401 | 401 | Key 无效或已失效 |
+| DeepSeek 返回 402 | 402 | 账户余额不足 |
+| DeepSeek 返回 429 | 429 | 请求过于频繁 |
+| DeepSeek 返回其他 4xx | 502 | 上游拒绝了请求，附状态码 |
+| DeepSeek 返回 5xx | 502 | 上游暂时不可用，附状态码 |
+| 请求 DeepSeek 超时（30 秒） | 504 | 调用超时 |
+| 无法连接 DeepSeek | 503 | 检查网络或代理 |
+| 返回 JSON 无法解析或缺少字段 | 502 | 返回格式异常 |
+| 前端请求体不合法 | 422 | FastAPI 自动校验提示 |
+| 前端完全连不上本服务 | 无 HTTP 响应 | 页面显示“请求失败：后端服务未启动或网络连接异常” |
+
+前端会先判断 `res.ok`：成功时显示 `data.reply`，失败时显示后端返回的 `data.detail`，不会再把错误响应当成正常回复显示成 `undefined`。
+
+仍需如实说明的边界：
+
+- 没有自动重试；超时或上游 5xx 需要用户手动重发。
+- 没有流式输出，必须等完整回复返回后一次性显示。
+- 没有多轮上下文；每次请求只把当前这一条 `message` 发给 DeepSeek，之前的对话不会带入。
+- 本服务自身没有登录、鉴权和限流，CORS 为本地演示放开了 `*`，不适合直接公网部署。
+- `check_deepseek_live.py` 只打印上游状态码和响应，不负责自动判定内容质量。
+
+## 9. 三步排查
+
+打开浏览器开发者工具，按 F12：
+
+1. **Console**：点击发送后应依次出现“标记A：即将执行fetch” → “标记B：fetch返回，拿到res” → “标记C：json解析完成”。
+2. **Network**：找到 `chat` 请求，成功时 Status 为 200；若为 4xx/5xx，查看 Response 里的 `detail`。
+3. **只有标记A 就报错**：说明请求没有到达后端，通常是后端未启动、端口不对，或前端 `CHAT_API` 与本机地址不一致。后端已启动时，`file://` 页面的 `Origin: null` 由 `allow_origins=["*"]` 放行。
+
+## 10. 最短验收清单
+
+- [ ] `cd chatbot/houduan && python -m pytest -q`，8 项通过。
+- [ ] `uvicorn main:app --port 8000` 启动后，`http://127.0.0.1:8000/docs` 返回 200。
+- [ ] 双击 `chatbot/qinduan/index.html`，输入消息能收到回复。
+- [ ] 消息超过列表高度后可滚动，最新消息贴底。
+- [ ] `git ls-files` 中没有 `.env`，`.gitignore` 忽略 `.env`，`.env.example` 已提交。
+- [ ] 改动端口或换机器时，已同步修改 `index.html` 中的 `CHAT_API`。
