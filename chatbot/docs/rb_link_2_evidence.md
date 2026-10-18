@@ -236,9 +236,11 @@ python -m pytest -q
 实际结果：
 
 ```text
-........                                                                 [100%]
-8 passed, 1 warning in 0.62s
+..........                                                               [100%]
+10 passed, 1 warning in 0.60s
 ```
+
+10 项包含新增的上游 402 映射测试和前端 HTML 无 Key 静态检查。
 
 清理 A/B/C 调试日志后的页面冒烟测试：
 
@@ -419,17 +421,21 @@ C. Automated tests (REPRODUCE.md 7)
 Command:
 
     cd chatbot/houduan
-    python -m pytest -q
+    python -m pytest -v
 
 Output:
 
-    ........                                                                 [100%]
-    ============================= warnings summary =============================
-    E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1
-      StarletteDeprecationWarning: Using `httpx` with `starlette.testclient`
-      is deprecated; install `httpx2` instead.
-    -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-    8 passed, 1 warning in 0.72s
+    test_chat.py::test_chat_interface PASSED
+    test_chat.py::test_missing_key_returns_503 PASSED
+    test_chat.py::test_upstream_401_returns_readable_error PASSED
+    test_chat.py::test_upstream_5xx_returns_502 PASSED
+    test_chat.py::test_upstream_402_returns_readable_error PASSED
+    test_chat.py::test_timeout_returns_504 PASSED
+    test_chat.py::test_connect_error_returns_503 PASSED
+    test_chat.py::test_malformed_upstream_payload_returns_502 PASSED
+    test_chat.py::test_cors_allows_file_origin_null PASSED
+    test_chat.py::test_frontend_html_has_no_secret_material PASSED
+    10 passed, 1 warning in 0.57s
 
 The warning does not change the test result.
 
@@ -663,4 +669,5 @@ There was no [upstream] line because _get_api_key() raised 503 before any
 outbound request. load_dotenv(ENV_PATH) runs only at module import time, so
 changing .env requires restarting uvicorn; otherwise the old process may still
 hold the previous key.
+
 ```

@@ -332,7 +332,7 @@ clientHeight=416, scrollHeight=716, maxScrollTop=300
 - 不监听 `127.0.0.1:8000`，不经过真实网络端口；
 - 不使用真实 `DEEPSEEK_API_KEY`；
 - 不访问 DeepSeek。测试通过 `pytest` 的 `monkeypatch` 把 `httpx.AsyncClient.post` 替换为本地假函数，返回构造好的 DeepSeek 响应；
-- 覆盖成功回复、缺少 Key、上游 401、上游 5xx、超时、连接失败、返回格式异常，以及 `file://` 的 `Origin: null` 预检，共 8 项。
+- 覆盖成功回复、缺少 Key、上游 401、上游 402、上游 5xx、超时、连接失败、返回格式异常、`file://` 的 `Origin: null` 预检，以及前端 HTML 无 Key 静态检查，共 10 项。
 
 它证明的是：路由、请求体校验、转发给 DeepSeek 的 URL/Header/模型参数、响应解析和错误映射的逻辑正确。它**不能**证明 8000 端口真的在监听；后者由第 5 节的 uvicorn + `/docs` 验证。
 
@@ -346,16 +346,18 @@ python -m pytest -v
 实际结果：
 
 ```text
-collected 8 items
+collected 10 items
 test_chat.py::test_chat_interface PASSED
 test_chat.py::test_missing_key_returns_503 PASSED
 test_chat.py::test_upstream_401_returns_readable_error PASSED
 test_chat.py::test_upstream_5xx_returns_502 PASSED
+test_chat.py::test_upstream_402_returns_readable_error PASSED
 test_chat.py::test_timeout_returns_504 PASSED
 test_chat.py::test_connect_error_returns_503 PASSED
 test_chat.py::test_malformed_upstream_payload_returns_502 PASSED
 test_chat.py::test_cors_allows_file_origin_null PASSED
-8 passed
+test_chat.py::test_frontend_html_has_no_secret_material PASSED
+10 passed
 ```
 
 ### 7.2 真实联调脚本
@@ -614,7 +616,7 @@ INFO:     127.0.0.1:<client-port> - "POST /chat HTTP/1.1" 200 OK
 
 ## 10. 最短验收清单
 
-- [ ] `cd chatbot/houduan && python -m pytest -q`，8 项通过。
+- [ ] `cd chatbot/houduan && python -m pytest -q`，10 项通过。
 - [ ] `uvicorn main:app --port 8000` 启动后，`http://127.0.0.1:8000/docs` 返回 200。
 - [ ] 双击 `chatbot/qinduan/index.html`，输入消息能收到回复。
 - [ ] 消息超过列表高度后可滚动，最新消息贴底。

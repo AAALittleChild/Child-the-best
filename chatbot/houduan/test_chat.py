@@ -5,6 +5,8 @@ TestClient 只证明 FastAPI 路由、请求校验、上游调用参数和错误
 uvicorn 启动后访问 /docs，或运行 check_deepseek_live.py（需要真实 Key）。
 """
 
+from pathlib import Path
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -101,6 +103,30 @@ def test_upstream_5xx_returns_502(client, monkeypatch, capsys):
     assert "unavailable" in log
 
 
+def test_upstream_402_returns_readable_error(client, monkeypatch, capsys):
+    async def fake_post(self, url, **kwargs):
+        return _fake_response(
+            url,
+            402,
+            {
+                "error": {
+                    "message": "Insufficient Balance",
+                    "type": "insufficient_quota",
+                }
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    response = client.post("/chat", json={"message": "余额测试"})
+
+    assert response.status_code == 402
+    assert "余额不足" in response.json()["detail"]
+    log = capsys.readouterr().err
+    assert "[upstream] 402" in log
+    assert "Insufficient Balance" in log
+
+
 def test_timeout_returns_504(client, monkeypatch, capsys):
     async def fake_post(self, url, **kwargs):
         raise httpx.ReadTimeout("timed out", request=httpx.Request("POST", url))
@@ -156,3 +182,13 @@ def test_cors_allows_file_origin_null(client):
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "*"
+
+
+def test_frontend_html_has_no_secret_material():
+    html_path = Path(__file__).resolve().parent.parent / "qinduan" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+
+    assert "sk-" not in html
+    assert "DEEPSEEK_API_KEY" not in html
+    assert "Authorization" not in html
+    assert "http://127.0.0.1:8000/chat" in html
