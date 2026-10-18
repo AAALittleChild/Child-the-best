@@ -131,43 +131,51 @@ Output:
 The warning does not change the test result.
 
 ============================================================
-D. Real DeepSeek reply check (PENDING)
+D. Real DeepSeek reply check (COMPLETED)
 ============================================================
 
-Status at capture time:
+Initial check before the key was provided:
 
     DEEPSEEK_API_KEY=NOT_SET
     chatbot/houduan/.env=ABSENT
 
-Therefore no real DeepSeek reply was executed or claimed. A local stub upstream
-proves the request chain, but it is not evidence of a real model response.
+Then a real key was supplied from the user's local .env. The key was read into
+the process environment only; it was not printed, copied into the repository,
+or committed.
 
-To complete this item on a machine with a real key:
+Command sequence:
+
+    # Start the current backend with DEEPSEEK_API_KEY in its environment.
+    cd chatbot/houduan
+    uvicorn main:app --port 8000
+
+    # In a second terminal:
+    cd chatbot/houduan
+    python check_real_chat.py
+
+Actual output:
+
+    状态码： 200
+    返回内容： {"reply":"你好！很高兴见到你，有什么我可以帮你的吗？无论是聊天、解答问题，还是需要一些建议，我都在这里。😊"}
+    reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论是聊天、解答问题，还是需要一些建议，我都在这里。😊
+
+This is a real DeepSeek response through POST http://127.0.0.1:8000/chat,
+not the local stub.
+
+Future reproduction:
 
     cd chatbot/houduan
     copy .env.example .env
     # edit .env and set DEEPSEEK_API_KEY=sk-...
     uvicorn main:app --port 8000
 
-In a second terminal:
-
-    cd chatbot/houduan
+    # second terminal
     python check_real_chat.py
 
-Expected successful output starts with:
-
-    状态码： 200
-    reply： ...
-
-Alternatively, the direct upstream check is:
+Direct upstream check:
 
     cd chatbot/houduan
     python check_deepseek_live.py
-
-Expected successful output starts with:
-
-    状态码： 200
-    返回内容： {'choices': [...]}
 
 ============================================================
 E. Final post-cleanup smoke test
