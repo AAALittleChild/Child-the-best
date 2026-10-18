@@ -285,7 +285,8 @@ clientHeight=416, scrollHeight=716, maxScrollTop=300
 
 以下为 runtime-evidence.txt 的当前完整内容，便于在单一证据文件中核对。
 
-```textChatbot runtime evidence
+```text
+Chatbot runtime evidence
 Captured: 2026-10-18 (Asia/Shanghai)
 Repository: https://github.com/AAALittleChild/Child-the-best
 Environment: Windows, Python 3.14.6, uvicorn 0.40.0, FastAPI 0.143.3, httpx 0.28.1
