@@ -2,6 +2,9 @@
 
 本文按仓库的真实目录和真实代码编写。复现路径、启动命令、测试性质、错误边界和前端行为都以当前代码为准。
 
+> 证据类型：description（实现说明）、runtime（实际启动与访问记录）、test（pytest 结果）。
+> Evidence tags: description, runtime, test.
+
 ## 1. 实际目录结构
 
 ```text
@@ -138,6 +141,110 @@ Invoke-RestMethod -Uri http://127.0.0.1:8000/chat `
 {"reply": "大模型生成的回答"}
 ```
 
+### 5.1 实际运行记录（runtime）
+
+以下为本机实际执行记录（Windows，Python 3.14.6，uvicorn 0.40.0）。
+
+启动后端：
+
+```powershell
+cd chatbot/houduan
+uvicorn main:app --port 8000
+```
+
+终端实际输出：
+
+```text
+INFO:     Started server process [23620]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+另开一个终端确认 8000 端口在监听：
+
+```powershell
+netstat -ano | findstr :8000
+Test-NetConnection -ComputerName 127.0.0.1 -Port 8000 -InformationLevel Quiet
+```
+
+实际输出：
+
+```text
+  TCP    127.0.0.1:8000         0.0.0.0:0              LISTENING       23620
+True
+```
+
+访问接口文档：
+
+```powershell
+(Invoke-WebRequest -Uri http://127.0.0.1:8000/docs -UseBasicParsing).StatusCode
+```
+
+实际输出：
+
+```text
+200
+```
+
+在没有配置 Key 的情况下请求 `/chat`，用于确认错误路径：
+
+```powershell
+curl.exe -i -X POST "http://127.0.0.1:8000/chat" `
+  -H "Content-Type: application/json" `
+  -d '{"message":"你好"}'
+```
+
+实际输出：
+
+```text
+HTTP/1.1 503 Service Unavailable
+{"detail":"后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。"}
+```
+
+CORS 预检（模拟 `file://` 页面的 `Origin: null`）：
+
+```powershell
+curl.exe -i -X OPTIONS "http://127.0.0.1:8000/chat" `
+  -H "Origin: null" `
+  -H "Access-Control-Request-Method: POST" `
+  -H "Access-Control-Request-Headers: content-type"
+```
+
+实际输出：
+
+```text
+HTTP/1.1 200 OK
+access-control-allow-origin: *
+```
+
+以上是真实 uvicorn 进程、真实 8000 端口和真实 HTTP 请求的结果，不是 `TestClient` 的进程内结果。
+
+### 5.2 前端端到端运行记录（本地桩上游）
+
+为了在不消耗真实 DeepSeek 额度、不依赖外网的情况下验证完整链路，本次使用了一个临时本地桩上游（只用于测试，未提交到仓库）：
+
+- 桩上游监听 `http://127.0.0.1:9001/v1/chat/completions`，返回 `{"choices":[{"message":{"content":"本地桩回复：收到「...」"}}]}`。
+- 后端测试入口把 `main.BASE_URL` 指向该桩上游，并设置临时 `DEEPSEEK_API_KEY=dummy-key-for-local-stub`。
+- 前端用 `python -m http.server 8080 --directory chatbot/qinduan` 提供同一份 `index.html`。这只是把打开方式从 `file://` 换成 `http://127.0.0.1:8080`，页面代码没有变化。
+
+桩上游和测试入口是一次性临时文件，未提交到仓库；这里保留的是实际运行结果。若要复现，可用任意返回 DeepSeek 兼容 JSON 的本地服务替代。
+
+浏览器实际操作结果：
+
+1. 输入 `你好`，点击发送：
+   - 页面显示：`你好`
+   - 页面显示：`本地桩回复：收到「你好」`
+   - Console 依次输出：`标记A：即将执行fetch`、`标记B：fetch返回，拿到res`、`标记C：json解析完成`
+2. 停掉 8000 端口后端，刷新页面，再发送 `后端未启动测试`：
+   - 页面显示：`请求失败：后端服务未启动或网络连接异常`
+   - Console 只出现 `标记A：即将执行fetch`，随后出现 `请求捕获异常： TypeError: Failed to fetch`
+3. 重新启动 8000 端口后端，刷新页面，发送 `恢复测试`：
+   - 页面显示：`本地桩回复：收到「恢复测试」`
+   - Console 再次出现 A/B/C
+
+这个记录证明了页面能发出真实 HTTP 请求、后端能接收并转发、前端能解析并显示回复，且后端不可用时前端有可读提示。真实 DeepSeek 回复仍需配置真实 Key 后运行 `check_deepseek_live.py`。
+
 ## 6. 打开前端
 
 直接双击打开 `chatbot/qinduan/index.html`，浏览器地址栏是 `file:///.../index.html`。不需要另起前端服务器。
@@ -270,6 +377,63 @@ POST /chat  -> 503
 1. **Console**：点击发送后应依次出现“标记A：即将执行fetch” → “标记B：fetch返回，拿到res” → “标记C：json解析完成”。
 2. **Network**：找到 `chat` 请求，成功时 Status 为 200；若为 4xx/5xx，查看 Response 里的 `detail`。
 3. **只有标记A 就报错**：说明请求没有到达后端，通常是后端未启动、端口不对，或前端 `CHAT_API` 与本机地址不一致。后端已启动时，`file://` 页面的 `Origin: null` 由 `allow_origins=["*"]` 放行。
+
+### 9.1 本次真实报错排查记录
+
+现象：停掉后端后，从页面发送消息，页面显示“请求失败：后端服务未启动或网络连接异常”，Console 报：
+
+```text
+请求捕获异常： TypeError: Failed to fetch
+```
+
+排查顺序：
+
+1. **后端端口是否在监听**：
+
+   ```powershell
+   netstat -ano | findstr :8000
+   ```
+
+   后端停止时没有 `LISTENING` 行；启动后出现：
+
+   ```text
+   TCP    127.0.0.1:8000         0.0.0.0:0              LISTENING       23620
+   ```
+
+   结论：`Failed to fetch` 的直接原因是 8000 端口没有服务监听。
+
+2. **前端 `CHAT_API` 是否一致**：打开 `index.html`，确认：
+
+   ```javascript
+   const CHAT_API = 'http://127.0.0.1:8000/chat';
+   ```
+
+   它与后端实际监听地址 `127.0.0.1:8000` 一致。如果后端换端口或换机器，必须同步改这一行，否则仍会 `Failed to fetch`。
+
+3. **CORS 是否放行**：`file://` 页面的 `Origin` 是 `null`。用 `curl` 模拟预检：
+
+   ```powershell
+   curl.exe -i -X OPTIONS "http://127.0.0.1:8000/chat" `
+     -H "Origin: null" `
+     -H "Access-Control-Request-Method: POST"
+   ```
+
+   当前 `allow_origins=["*"]` 返回：
+
+   ```text
+   HTTP/1.1 200 OK
+   access-control-allow-origin: *
+   ```
+
+   因此浏览器不会因 CORS 拦截。如果删除该中间件或改成不包含 `null` 的白名单，浏览器会报 `No 'Access-Control-Allow-Origin' header is present on the requested resource.`，页面同样会进入 catch 分支。
+
+4. **恢复**：重新启动 `uvicorn main:app --port 8000`，刷新页面，再发送消息，页面恢复显示回复，Console 重新出现 A/B/C。
+
+另一个已修复的真实代码错误：
+
+- 原 `main.py` 没有 `raise_for_status()`。DeepSeek 返回 401 时，响应体是 `{"error": ...}`，没有 `choices`，执行 `res_data["choices"]` 会抛 `KeyError: 'choices'`，FastAPI 最终返回 500。
+- 修复：先 `resp.raise_for_status()`，再捕获 `httpx.HTTPStatusError`，按状态码返回 401/402/429 或 502，并给出可读 `detail`。
+- 回归测试：`test_upstream_401_returns_readable_error` 和 `test_upstream_5xx_returns_502` 均通过。
 
 ## 10. 最短验收清单
 
