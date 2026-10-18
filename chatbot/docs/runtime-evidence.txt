@@ -395,25 +395,26 @@ changing .env requires restarting uvicorn; otherwise the old process may still
 hold the previous key.
 
 ============================================================
-K. Method A (file://) page acceptance (manual)
+K. Method A (file://) page check (user-provided run)
 ============================================================
 
-The automated browser environment blocks the file:// protocol, so no automated
-file:// page result is claimed in this file.
+User-provided browser console and backend access log (2026-10-18):
 
-Manual steps:
+    标记A：即将执行fetch
+    index.html:45 标记B：fetch返回，拿到res
+    index.html:47 标记C：json解析完成
+    INFO:     127.0.0.1:52917 - "OPTIONS /chat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:52917 - "POST /chat HTTP/1.1" 200 OK
 
-    1. Start the backend with a real DEEPSEEK_API_KEY.
-    2. Double-click chatbot/qinduan/index.html so the address bar is
-       file:///.../chatbot/qinduan/index.html.
-    3. Send "请用一句话介绍你自己".
+Interpretation:
 
-Expected result:
-
-    - The page shows the question and a bot reply.
-    - DevTools Network shows POST /chat with HTTP 200.
-    - Response headers include access-control-allow-origin: *.
-    - Console has no CORS error.
-
-Status: manual acceptance step, not an automated result. Method B in section H
-is a verified page-success run but does not replace this file:// browser check.
+    - A/B/C show the fetch started, the response returned, and JSON parsing
+      completed under the file:// page.
+    - OPTIONS 200 shows the CORS preflight passed; POST 200 shows the browser
+      actually sent the chat request and the backend accepted it.
+    - The snippet does not include page text or a screenshot, so no exact
+      rendered reply is claimed here. Method B in section H has the verified
+      page-text success evidence.
+    - The A/B/C lines belong to the pre-cleanup index.html. The current
+      index.html removed those console.log statements, but the fetch/JSON/render
+      path is unchanged.

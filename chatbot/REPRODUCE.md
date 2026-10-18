@@ -275,7 +275,7 @@ access-control-allow-origin: *
 
 本文 5.2 和 7.5 的页面实测使用方式 B，因为便于自动读取页面文字；方式 A 的 `Origin: null` 预检已用 curl 单独验证（见下文）。两种方式任选一种即可复现，不要把方式 B 的地址误写成 `file://`。
 
-### 6.2 方式 A（`file://`）页面验收步骤
+### 6.2 方式 A（`file://`）页面验收与实测原文
 
 方式 A 的页面级验收需要在普通浏览器里手工执行；当前用于自动取证的浏览器环境禁止 `file://` 协议，因此这里不伪造自动化结果。
 
@@ -284,6 +284,18 @@ access-control-allow-origin: *
 3. 输入 `请用一句话介绍你自己` 并点击发送。
 4. 预期页面出现该问题和一条机器人回复；DevTools 的 Network 中 `POST /chat` 为 `200`；Response Headers 含 `access-control-allow-origin: *`；Console 无 CORS 报错。
 5. 如果页面报 `请求失败：后端服务未启动或网络连接异常`，按第 9 节的“端口 → `CHAT_API` → CORS”顺序排查。
+
+用户提供的本机运行原文（2026-10-18）：
+
+```text
+标记A：即将执行fetch
+index.html:45 标记B：fetch返回，拿到res
+index.html:47 标记C：json解析完成
+INFO:     127.0.0.1:52917 - "OPTIONS /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52917 - "POST /chat HTTP/1.1" 200 OK
+```
+
+这说明 `file://` 下 fetch 已发出、响应已返回、JSON 已解析，且预检和聊天请求都是 200。该片段没有包含页面文字或截图，因此不额外声称“页面已显示具体回复”；方式 B 的 7.5 已有页面文字成功证据。A/B/C 来自清理调试日志前的 `index.html`，当前版本已移除这三行 `console.log`，但 fetch/JSON/渲染路径未变。
 
 前端请求地址是硬编码的，集中在 `index.html` 的这一行：
 

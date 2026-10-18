@@ -226,16 +226,19 @@ INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
 
 成功路径的兜底边界：`chatbot/houduan/main.py:99` 直接取 `res_data["choices"][0]["message"]["content"]`，没有 `.get()`、默认回复、重试或备用模型；缺 `choices`、`message` 或 `content` 时由 `main.py:128` 捕获并返回 `main.py:136` 的 502；`content` 为 `null` 或非字符串时没有非空/类型校验。这里的兜底只是“失败转 502”，不是“成功内容兜底”。
 
-### 4.2 方式 A（`file://`）页面验收（手工）
+### 4.2 方式 A（`file://`）页面实测（用户提供）
 
-当前自动化浏览器环境禁止 `file://` 协议，无法在这里生成方式 A 的自动化页面结果，不伪造。手工验收步骤：
+用户提供的本机运行原文（2026-10-18）：
 
-1. 按第 1 节启动后端并配置真实 Key。
-2. 双击 `chatbot/qinduan/index.html`，地址栏应为 `file:///.../index.html`。
-3. 发送 `请用一句话介绍你自己`。
-4. 页面应显示该问题和一条机器人回复；DevTools Network 中 `POST /chat` 应为 `200`，Response Headers 含 `access-control-allow-origin: *`，Console 无 CORS 报错。
+```text
+标记A：即将执行fetch
+index.html:45 标记B：fetch返回，拿到res
+index.html:47 标记C：json解析完成
+INFO:     127.0.0.1:52917 - "OPTIONS /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52917 - "POST /chat HTTP/1.1" 200 OK
+```
 
-这一条目前是“手工验收步骤”，不是自动化结果；方式 B 的 H 节是已验证的页面成功路径，不能替代方式 A 的浏览器实测。
+A/B/C 说明 `file://` 下 fetch 已发出、响应已返回、JSON 已解析；`OPTIONS 200` 说明 CORS 预检通过，`POST 200` 说明浏览器确实发出了聊天请求。该片段未包含页面文字或截图，因此这里不额外声称“页面已显示具体回复”；方式 B 的 4.1 已有页面文字成功证据。A/B/C 来自清理调试日志前的 `index.html`，当前版本已移除这三行 `console.log`，但 fetch/JSON/渲染路径未变。
 
 ## 5. 测试与最终页面状态
 
@@ -719,27 +722,28 @@ changing .env requires restarting uvicorn; otherwise the old process may still
 hold the previous key.
 
 ============================================================
-K. Method A (file://) page acceptance (manual)
+K. Method A (file://) page check (user-provided run)
 ============================================================
 
-The automated browser environment blocks the file:// protocol, so no automated
-file:// page result is claimed in this file.
+User-provided browser console and backend access log (2026-10-18):
 
-Manual steps:
+    标记A：即将执行fetch
+    index.html:45 标记B：fetch返回，拿到res
+    index.html:47 标记C：json解析完成
+    INFO:     127.0.0.1:52917 - "OPTIONS /chat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:52917 - "POST /chat HTTP/1.1" 200 OK
 
-    1. Start the backend with a real DEEPSEEK_API_KEY.
-    2. Double-click chatbot/qinduan/index.html so the address bar is
-       file:///.../chatbot/qinduan/index.html.
-    3. Send "请用一句话介绍你自己".
+Interpretation:
 
-Expected result:
-
-    - The page shows the question and a bot reply.
-    - DevTools Network shows POST /chat with HTTP 200.
-    - Response headers include access-control-allow-origin: *.
-    - Console has no CORS error.
-
-Status: manual acceptance step, not an automated result. Method B in section H
-is a verified page-success run but does not replace this file:// browser check.
+    - A/B/C show the fetch started, the response returned, and JSON parsing
+      completed under the file:// page.
+    - OPTIONS 200 shows the CORS preflight passed; POST 200 shows the browser
+      actually sent the chat request and the backend accepted it.
+    - The snippet does not include page text or a screenshot, so no exact
+      rendered reply is claimed here. Method B in section H has the verified
+      page-text success evidence.
+    - The A/B/C lines belong to the pre-cleanup index.html. The current
+      index.html removed those console.log statements, but the fetch/JSON/render
+      path is unchanged.
 
 ```
