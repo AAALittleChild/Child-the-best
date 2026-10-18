@@ -135,17 +135,31 @@ Command:
 
 Output:
 
-    test_chat.py::test_chat_interface PASSED
-    test_chat.py::test_missing_key_returns_503 PASSED
-    test_chat.py::test_upstream_401_returns_readable_error PASSED
-    test_chat.py::test_upstream_5xx_returns_502 PASSED
-    test_chat.py::test_upstream_402_returns_readable_error PASSED
-    test_chat.py::test_timeout_returns_504 PASSED
-    test_chat.py::test_connect_error_returns_503 PASSED
-    test_chat.py::test_malformed_upstream_payload_returns_502 PASSED
-    test_chat.py::test_cors_allows_file_origin_null PASSED
-    test_chat.py::test_frontend_html_has_no_secret_material PASSED
-    10 passed, 1 warning in 0.57s
+    ============================= test session starts =============================
+    platform win32 -- Python 3.14.6, pytest-9.0.3, pluggy-1.6.0 -- E:\Anaconda\python.exe
+    cachedir: .pytest_cache
+    rootdir: C:\Users\jimoq\Documents\Test\Child-the-best\chatbot\houduan
+    plugins: anyio-4.12.1
+    collecting ... collected 10 items
+
+    test_chat.py::test_chat_interface PASSED                                 [ 10%]
+    test_chat.py::test_missing_key_returns_503 PASSED                        [ 20%]
+    test_chat.py::test_upstream_401_returns_readable_error PASSED            [ 30%]
+    test_chat.py::test_upstream_5xx_returns_502 PASSED                       [ 40%]
+    test_chat.py::test_upstream_402_returns_readable_error PASSED            [ 50%]
+    test_chat.py::test_timeout_returns_504 PASSED                            [ 60%]
+    test_chat.py::test_connect_error_returns_503 PASSED                      [ 70%]
+    test_chat.py::test_malformed_upstream_payload_returns_502 PASSED         [ 80%]
+    test_chat.py::test_cors_allows_file_origin_null PASSED                   [ 90%]
+    test_chat.py::test_frontend_html_has_no_secret_material PASSED           [100%]
+
+    ============================== warnings summary ===============================
+    E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1
+      E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+        from starlette.testclient import TestClient as TestClient  # noqa
+
+    -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+    ======================== 10 passed, 1 warning in 0.58s ========================
 
 The warning does not change the test result.
 
@@ -379,3 +393,27 @@ There was no [upstream] line because _get_api_key() raised 503 before any
 outbound request. load_dotenv(ENV_PATH) runs only at module import time, so
 changing .env requires restarting uvicorn; otherwise the old process may still
 hold the previous key.
+
+============================================================
+K. Method A (file://) page acceptance (manual)
+============================================================
+
+The automated browser environment blocks the file:// protocol, so no automated
+file:// page result is claimed in this file.
+
+Manual steps:
+
+    1. Start the backend with a real DEEPSEEK_API_KEY.
+    2. Double-click chatbot/qinduan/index.html so the address bar is
+       file:///.../chatbot/qinduan/index.html.
+    3. Send "请用一句话介绍你自己".
+
+Expected result:
+
+    - The page shows the question and a bot reply.
+    - DevTools Network shows POST /chat with HTTP 200.
+    - Response headers include access-control-allow-origin: *.
+    - Console has no CORS error.
+
+Status: manual acceptance step, not an automated result. Method B in section H
+is a verified page-success run but does not replace this file:// browser check.

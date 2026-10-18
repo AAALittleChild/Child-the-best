@@ -226,18 +226,52 @@ INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
 
 成功路径的兜底边界：`chatbot/houduan/main.py:99` 直接取 `res_data["choices"][0]["message"]["content"]`，没有 `.get()`、默认回复、重试或备用模型；缺 `choices`、`message` 或 `content` 时由 `main.py:128` 捕获并返回 `main.py:136` 的 502；`content` 为 `null` 或非字符串时没有非空/类型校验。这里的兜底只是“失败转 502”，不是“成功内容兜底”。
 
+### 4.2 方式 A（`file://`）页面验收（手工）
+
+当前自动化浏览器环境禁止 `file://` 协议，无法在这里生成方式 A 的自动化页面结果，不伪造。手工验收步骤：
+
+1. 按第 1 节启动后端并配置真实 Key。
+2. 双击 `chatbot/qinduan/index.html`，地址栏应为 `file:///.../index.html`。
+3. 发送 `请用一句话介绍你自己`。
+4. 页面应显示该问题和一条机器人回复；DevTools Network 中 `POST /chat` 应为 `200`，Response Headers 含 `access-control-allow-origin: *`，Console 无 CORS 报错。
+
+这一条目前是“手工验收步骤”，不是自动化结果；方式 B 的 H 节是已验证的页面成功路径，不能替代方式 A 的浏览器实测。
+
 ## 5. 测试与最终页面状态
 
 ```powershell
 cd chatbot/houduan
-python -m pytest -q
+python -m pytest -v
 ```
 
 实际结果：
 
 ```text
-..........                                                               [100%]
-10 passed, 1 warning in 0.60s
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.0.3, pluggy-1.6.0 -- E:\Anaconda\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\jimoq\Documents\Test\Child-the-best\chatbot\houduan
+plugins: anyio-4.12.1
+collecting ... collected 10 items
+
+test_chat.py::test_chat_interface PASSED                                 [ 10%]
+test_chat.py::test_missing_key_returns_503 PASSED                        [ 20%]
+test_chat.py::test_upstream_401_returns_readable_error PASSED            [ 30%]
+test_chat.py::test_upstream_5xx_returns_502 PASSED                       [ 40%]
+test_chat.py::test_upstream_402_returns_readable_error PASSED            [ 50%]
+test_chat.py::test_timeout_returns_504 PASSED                            [ 60%]
+test_chat.py::test_connect_error_returns_503 PASSED                      [ 70%]
+test_chat.py::test_malformed_upstream_payload_returns_502 PASSED         [ 80%]
+test_chat.py::test_cors_allows_file_origin_null PASSED                   [ 90%]
+test_chat.py::test_frontend_html_has_no_secret_material PASSED           [100%]
+
+============================== warnings summary ===============================
+E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1
+  E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 10 passed, 1 warning in 0.58s ========================
 ```
 
 10 项包含新增的上游 402 映射测试和前端 HTML 无 Key 静态检查。
@@ -425,17 +459,31 @@ Command:
 
 Output:
 
-    test_chat.py::test_chat_interface PASSED
-    test_chat.py::test_missing_key_returns_503 PASSED
-    test_chat.py::test_upstream_401_returns_readable_error PASSED
-    test_chat.py::test_upstream_5xx_returns_502 PASSED
-    test_chat.py::test_upstream_402_returns_readable_error PASSED
-    test_chat.py::test_timeout_returns_504 PASSED
-    test_chat.py::test_connect_error_returns_503 PASSED
-    test_chat.py::test_malformed_upstream_payload_returns_502 PASSED
-    test_chat.py::test_cors_allows_file_origin_null PASSED
-    test_chat.py::test_frontend_html_has_no_secret_material PASSED
-    10 passed, 1 warning in 0.57s
+    ============================= test session starts =============================
+    platform win32 -- Python 3.14.6, pytest-9.0.3, pluggy-1.6.0 -- E:\Anaconda\python.exe
+    cachedir: .pytest_cache
+    rootdir: C:\Users\jimoq\Documents\Test\Child-the-best\chatbot\houduan
+    plugins: anyio-4.12.1
+    collecting ... collected 10 items
+
+    test_chat.py::test_chat_interface PASSED                                 [ 10%]
+    test_chat.py::test_missing_key_returns_503 PASSED                        [ 20%]
+    test_chat.py::test_upstream_401_returns_readable_error PASSED            [ 30%]
+    test_chat.py::test_upstream_5xx_returns_502 PASSED                       [ 40%]
+    test_chat.py::test_upstream_402_returns_readable_error PASSED            [ 50%]
+    test_chat.py::test_timeout_returns_504 PASSED                            [ 60%]
+    test_chat.py::test_connect_error_returns_503 PASSED                      [ 70%]
+    test_chat.py::test_malformed_upstream_payload_returns_502 PASSED         [ 80%]
+    test_chat.py::test_cors_allows_file_origin_null PASSED                   [ 90%]
+    test_chat.py::test_frontend_html_has_no_secret_material PASSED           [100%]
+
+    ============================== warnings summary ===============================
+    E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1
+      E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+        from starlette.testclient import TestClient as TestClient  # noqa
+
+    -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+    ======================== 10 passed, 1 warning in 0.58s ========================
 
 The warning does not change the test result.
 
@@ -669,5 +717,29 @@ There was no [upstream] line because _get_api_key() raised 503 before any
 outbound request. load_dotenv(ENV_PATH) runs only at module import time, so
 changing .env requires restarting uvicorn; otherwise the old process may still
 hold the previous key.
+
+============================================================
+K. Method A (file://) page acceptance (manual)
+============================================================
+
+The automated browser environment blocks the file:// protocol, so no automated
+file:// page result is claimed in this file.
+
+Manual steps:
+
+    1. Start the backend with a real DEEPSEEK_API_KEY.
+    2. Double-click chatbot/qinduan/index.html so the address bar is
+       file:///.../chatbot/qinduan/index.html.
+    3. Send "请用一句话介绍你自己".
+
+Expected result:
+
+    - The page shows the question and a bot reply.
+    - DevTools Network shows POST /chat with HTTP 200.
+    - Response headers include access-control-allow-origin: *.
+    - Console has no CORS error.
+
+Status: manual acceptance step, not an automated result. Method B in section H
+is a verified page-success run but does not replace this file:// browser check.
 
 ```

@@ -275,6 +275,16 @@ access-control-allow-origin: *
 
 本文 5.2 和 7.5 的页面实测使用方式 B，因为便于自动读取页面文字；方式 A 的 `Origin: null` 预检已用 curl 单独验证（见下文）。两种方式任选一种即可复现，不要把方式 B 的地址误写成 `file://`。
 
+### 6.2 方式 A（`file://`）页面验收步骤
+
+方式 A 的页面级验收需要在普通浏览器里手工执行；当前用于自动取证的浏览器环境禁止 `file://` 协议，因此这里不伪造自动化结果。
+
+1. 按 7.5.1 启动后端并配置真实 Key。
+2. 双击 `chatbot/qinduan/index.html`，确认地址栏是 `file:///.../index.html`。
+3. 输入 `请用一句话介绍你自己` 并点击发送。
+4. 预期页面出现该问题和一条机器人回复；DevTools 的 Network 中 `POST /chat` 为 `200`；Response Headers 含 `access-control-allow-origin: *`；Console 无 CORS 报错。
+5. 如果页面报 `请求失败：后端服务未启动或网络连接异常`，按第 9 节的“端口 → `CHAT_API` → CORS”顺序排查。
+
 前端请求地址是硬编码的，集中在 `index.html` 的这一行：
 
 ```javascript
@@ -346,18 +356,31 @@ python -m pytest -v
 实际结果：
 
 ```text
-collected 10 items
-test_chat.py::test_chat_interface PASSED
-test_chat.py::test_missing_key_returns_503 PASSED
-test_chat.py::test_upstream_401_returns_readable_error PASSED
-test_chat.py::test_upstream_5xx_returns_502 PASSED
-test_chat.py::test_upstream_402_returns_readable_error PASSED
-test_chat.py::test_timeout_returns_504 PASSED
-test_chat.py::test_connect_error_returns_503 PASSED
-test_chat.py::test_malformed_upstream_payload_returns_502 PASSED
-test_chat.py::test_cors_allows_file_origin_null PASSED
-test_chat.py::test_frontend_html_has_no_secret_material PASSED
-10 passed
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.0.3, pluggy-1.6.0 -- E:\Anaconda\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\jimoq\Documents\Test\Child-the-best\chatbot\houduan
+plugins: anyio-4.12.1
+collecting ... collected 10 items
+
+test_chat.py::test_chat_interface PASSED                                 [ 10%]
+test_chat.py::test_missing_key_returns_503 PASSED                        [ 20%]
+test_chat.py::test_upstream_401_returns_readable_error PASSED            [ 30%]
+test_chat.py::test_upstream_5xx_returns_502 PASSED                       [ 40%]
+test_chat.py::test_upstream_402_returns_readable_error PASSED            [ 50%]
+test_chat.py::test_timeout_returns_504 PASSED                            [ 60%]
+test_chat.py::test_connect_error_returns_503 PASSED                      [ 70%]
+test_chat.py::test_malformed_upstream_payload_returns_502 PASSED         [ 80%]
+test_chat.py::test_cors_allows_file_origin_null PASSED                   [ 90%]
+test_chat.py::test_frontend_html_has_no_secret_material PASSED           [100%]
+
+============================== warnings summary ===============================
+E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1
+  E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 10 passed, 1 warning in 0.58s ========================
 ```
 
 ### 7.2 真实联调脚本
