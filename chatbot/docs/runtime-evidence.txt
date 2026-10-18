@@ -312,3 +312,25 @@ Success-path fallback boundary:
 
 This success run proves the valid response shape works. It does not add a
 content-level fallback for a malformed successful response.
+
+============================================================
+I. Message list scroll verification (local stub upstream)
+============================================================
+
+15 messages were sent, producing 30 child nodes (15 user + 15 bot).
+
+Raw metrics:
+
+    {"atBottom":true,"childCount":30,"clientHeight":416,"lastText":"收到：滚动测试第 15 条","maxScrollTop":300,"scrollHeight":716,"scrollTop":300}
+
+After scrolling up one page:
+
+    {"atBottom":false,"scrollTop":0,"maxScrollTop":300}
+
+After scrolling down in the message area:
+
+    {"atBottom":true,"scrollTop":300,"maxScrollTop":300}
+
+This confirms the message list is scrollable, the latest message is pinned to
+the bottom after appending, and the user can scroll up and back down. The test
+used a local stub upstream and only exercises frontend scrolling.

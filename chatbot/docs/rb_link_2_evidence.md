@@ -219,6 +219,19 @@ Console： []
 
 说明最终页面仍能发出请求、读取非 2xx 响应的 `detail` 并显示，且不再输出 A/B/C 调试标记。
 
+### 5.1 消息滚动实测（本地桩上游）
+
+连发 15 条消息，共 30 个消息节点（15 条用户消息 + 15 条机器人回复）：
+
+```text
+clientHeight=416, scrollHeight=716, maxScrollTop=300
+发送后：scrollTop=300, atBottom=true, 最后一条=收到：滚动测试第 15 条
+向上滚一页：scrollTop=0, atBottom=false
+向下滚回：scrollTop=300, atBottom=true
+```
+
+说明列表内容超过可视高度、可以上下滚动，最新一条在追加后仍贴底。该测试只验证前端滚动，使用本地桩上游，不依赖真实模型。
+
 ## 6. 评审项对应关系
 
 | 评审项 | 位置 |

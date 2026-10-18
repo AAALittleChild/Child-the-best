@@ -312,6 +312,17 @@ msgList.scrollTop = msgList.scrollHeight;
 
 因此消息变多后可以上下滚动，最新一条始终贴底。
 
+实测（本地桩上游，连发 15 条，共 30 个消息节点）：
+
+```text
+clientHeight=416, scrollHeight=716, maxScrollTop=300
+发送后：scrollTop=300, atBottom=true, 最后一条=收到：滚动测试第 15 条
+向上滚一页：scrollTop=0, atBottom=false
+向下滚回：scrollTop=300, atBottom=true
+```
+
+这组数字直接证明列表内容超过可视高度、可以上下滚动，且每次追加消息后最新一条仍在底部。该测试只验证前端滚动，使用本地桩上游，不依赖真实模型。
+
 ## 7. 测试说明与证据
 
 ### 7.1 `test_chat.py` 是什么测试
