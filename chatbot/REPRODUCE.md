@@ -5,6 +5,8 @@
 > 证据类型：description（实现说明）、runtime（实际启动与访问记录）、test（pytest 结果）。
 > Evidence tags: description, runtime, test.
 
+原始命令输出文本见 [chatbot/docs/runtime-evidence.txt](docs/runtime-evidence.txt)。
+
 ## 1. 实际目录结构
 
 ```text
@@ -13,12 +15,15 @@ Child-the-best/
    ├─ houduan/                  # 后端，启动目录
    │  ├─ main.py                # FastAPI 应用
    │  ├─ test_chat.py           # pytest 离线接口测试
-   │  ├─ check_deepseek_live.py # 手动真实联调脚本（不参与 pytest）
+   │  ├─ check_deepseek_live.py # 直连 DeepSeek 的手动联调脚本（不参与 pytest）
+   │  ├─ check_real_chat.py     # 经本地 /chat 的真实端到端联调脚本
    │  ├─ requirements.txt
    │  ├─ .env.example           # 变量名占位模板，可提交
    │  └─ .env                   # 本地真实 Key，不提交
    ├─ qinduan/
    │  └─ index.html             # 前端页面，用 file:// 直接打开
+   ├─ docs/
+   │  └─ runtime-evidence.txt   # 原始运行文本证据
    └─ REPRODUCE.md
 ```
 
@@ -235,15 +240,15 @@ access-control-allow-origin: *
 1. 输入 `你好`，点击发送：
    - 页面显示：`你好`
    - 页面显示：`本地桩回复：收到「你好」`
-   - Console 依次输出：`标记A：即将执行fetch`、`标记B：fetch返回，拿到res`、`标记C：json解析完成`
+   - 最终版本的 `index.html` 已移除 A/B/C 调试日志；清理前的 Console 原文保留在 `chatbot/docs/runtime-evidence.txt`
 2. 停掉 8000 端口后端，刷新页面，再发送 `后端未启动测试`：
    - 页面显示：`请求失败：后端服务未启动或网络连接异常`
-   - Console 只出现 `标记A：即将执行fetch`，随后出现 `请求捕获异常： TypeError: Failed to fetch`
+   - Console 报 `请求捕获异常： TypeError: Failed to fetch`
 3. 重新启动 8000 端口后端，刷新页面，发送 `恢复测试`：
    - 页面显示：`本地桩回复：收到「恢复测试」`
-   - Console 再次出现 A/B/C
+   - 页面恢复显示回复，说明 `/chat` 请求已成功
 
-这个记录证明了页面能发出真实 HTTP 请求、后端能接收并转发、前端能解析并显示回复，且后端不可用时前端有可读提示。真实 DeepSeek 回复仍需配置真实 Key 后运行 `check_deepseek_live.py`。
+这个记录证明了页面能发出真实 HTTP 请求、后端能接收并转发、前端能解析并显示回复，且后端不可用时前端有可读提示。真实 DeepSeek 回复仍需配置真实 Key 后运行 `check_real_chat.py` 或 `check_deepseek_live.py`。
 
 ## 6. 打开前端
 
@@ -342,6 +347,32 @@ POST /chat  -> 503
 
 这说明端口确实在监听，且缺少 Key 时返回的是可读 JSON，而不是 500 堆栈。
 
+### 7.4 真实 Key 的端到端验证（需本机配置）
+
+先按第 3 节把真实 Key 写入 `chatbot/houduan/.env`，再启动后端：
+
+```powershell
+cd chatbot/houduan
+uvicorn main:app --port 8000
+```
+
+另开一个终端，运行：
+
+```powershell
+cd chatbot/houduan
+python check_real_chat.py
+```
+
+它发送的是与页面完全相同的 `POST http://127.0.0.1:8000/chat`，因此验证的是“前端同款请求 → 本地后端 → DeepSeek → 返回”的完整链路。成功时输出类似：
+
+```text
+状态码： 200
+返回内容： {"reply":"..."}
+reply： ...
+```
+
+若没有配置 Key，脚本会直接退出并提示先配置 `DEEPSEEK_API_KEY`，不会发出真实请求。
+
 ## 8. 异常处理与边界
 
 后端当前的错误映射如下，均为 JSON `{"detail": "..."}` 形式：
@@ -374,9 +405,9 @@ POST /chat  -> 503
 
 打开浏览器开发者工具，按 F12：
 
-1. **Console**：点击发送后应依次出现“标记A：即将执行fetch” → “标记B：fetch返回，拿到res” → “标记C：json解析完成”。
-2. **Network**：找到 `chat` 请求，成功时 Status 为 200；若为 4xx/5xx，查看 Response 里的 `detail`。
-3. **只有标记A 就报错**：说明请求没有到达后端，通常是后端未启动、端口不对，或前端 `CHAT_API` 与本机地址不一致。后端已启动时，`file://` 页面的 `Origin: null` 由 `allow_origins=["*"]` 放行。
+1. **Network**：找到 `/chat` 请求，成功时 Status 为 200；若为 4xx/5xx，查看 Response 里的 `detail`。
+2. **Console**：如果请求没有到达后端，会看到 `请求捕获异常： TypeError: Failed to fetch`。
+3. **判断方向**：`Failed to fetch` 通常是后端未启动、端口不对，或前端 `CHAT_API` 与本机地址不一致；如果出现 CORS 相关报错，检查 `file://` 页面的 `Origin: null` 是否被 `allow_origins=["*"]` 放行。
 
 ### 9.1 本次真实报错排查记录
 
@@ -427,7 +458,7 @@ POST /chat  -> 503
 
    因此浏览器不会因 CORS 拦截。如果删除该中间件或改成不包含 `null` 的白名单，浏览器会报 `No 'Access-Control-Allow-Origin' header is present on the requested resource.`，页面同样会进入 catch 分支。
 
-4. **恢复**：重新启动 `uvicorn main:app --port 8000`，刷新页面，再发送消息，页面恢复显示回复，Console 重新出现 A/B/C。
+4. **恢复**：重新启动 `uvicorn main:app --port 8000`，刷新页面，再发送消息，页面恢复显示回复。
 
 另一个已修复的真实代码错误：
 

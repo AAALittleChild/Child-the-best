@@ -1,0 +1,190 @@
+Chatbot runtime evidence
+Captured: 2026-10-18 (Asia/Shanghai)
+Repository: https://github.com/AAALittleChild/Child-the-best
+Environment: Windows, Python 3.14.6, uvicorn 0.40.0, FastAPI 0.143.3, httpx 0.28.1
+
+This file preserves the raw command outputs behind REPRODUCE.md sections 5.1,
+5.2, 7 and 9.1. It is text evidence, not a summary written after the fact.
+
+============================================================
+A. Backend startup and HTTP checks (REPRODUCE.md 5.1)
+============================================================
+
+Command:
+
+    cd chatbot/houduan
+    uvicorn main:app --port 8000
+
+Terminal output (stderr):
+
+    INFO:     Started server process [23620]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+
+Port check:
+
+    netstat -ano | findstr :8000
+      TCP    127.0.0.1:8000         0.0.0.0:0              LISTENING       23620
+
+    Test-NetConnection -ComputerName 127.0.0.1 -Port 8000 -InformationLevel Quiet
+    True
+
+FastAPI docs:
+
+    (Invoke-WebRequest -Uri http://127.0.0.1:8000/docs -UseBasicParsing).StatusCode
+    200
+
+POST /chat with no DEEPSEEK_API_KEY configured:
+
+    curl.exe -i -X POST 'http://127.0.0.1:8000/chat' -H 'Content-Type: application/json' -d '{"message":"你好"}'
+
+    HTTP/1.1 503 Service Unavailable
+    date: Sun, 18 Oct 2026 02:20:17 GMT
+    server: uvicorn
+    content-length: 103
+    content-type: application/json
+
+    {"detail":"后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。"}
+
+CORS preflight with file:// origin null:
+
+    curl.exe -i -X OPTIONS 'http://127.0.0.1:8000/chat' -H 'Origin: null' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type'
+
+    HTTP/1.1 200 OK
+    date: Sun, 18 Oct 2026 02:20:17 GMT
+    server: uvicorn
+    access-control-allow-origin: *
+    access-control-allow-methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+    access-control-max-age: 600
+    access-control-allow-headers: content-type
+    content-length: 2
+    content-type: text/plain; charset=utf-8
+
+    OK
+
+============================================================
+B. Frontend end-to-end run (REPRODUCE.md 5.2)
+   Captured BEFORE removing the A/B/C debug logs
+============================================================
+
+Test setup:
+
+    - Temporary stub upstream: http://127.0.0.1:9001/v1/chat/completions
+    - Temporary backend: main.BASE_URL pointed to the stub, dummy test key
+    - Frontend served unchanged at http://127.0.0.1:8080/index.html
+      (same index.html; only the opening origin differs from file://)
+
+Success case:
+
+    page text: 你好
+    page text: 本地桩回复：收到「你好」
+
+    browser console:
+    [log 2026-10-18T02:18:19.790Z] 标记A：即将执行fetch
+    [log 2026-10-18T02:18:19.836Z] 标记B：fetch返回，拿到res
+    [log 2026-10-18T02:18:19.836Z] 标记C：json解析完成
+
+Backend stopped case:
+
+    page text: 请求失败：后端服务未启动或网络连接异常
+
+    browser console:
+    [log   2026-10-18T02:18:34.319Z] 标记A：即将执行fetch
+    [error 2026-10-18T02:18:34.326Z] 请求捕获异常： TypeError: Failed to fetch
+                                     at HTMLButtonElement.<anonymous>
+                                     (http://127.0.0.1:8080/index.html:40:35)
+
+Recovery case (backend restarted):
+
+    page text: 恢复测试
+    page text: 本地桩回复：收到「恢复测试」
+
+    browser console:
+    [log 2026-10-18T02:19:15.851Z] 标记A：即将执行fetch
+    [log 2026-10-18T02:19:16.012Z] 标记B：fetch返回，拿到res
+    [log 2026-10-18T02:19:16.012Z] 标记C：json解析完成
+
+Note: the final index.html removes the three console.log statements marked
+A/B/C. The transcript above is kept as historical runtime evidence. The final
+version still keeps console.error for a failed fetch.
+
+============================================================
+C. Automated tests (REPRODUCE.md 7)
+============================================================
+
+Command:
+
+    cd chatbot/houduan
+    python -m pytest -q
+
+Output:
+
+    ........                                                                 [100%]
+    ============================= warnings summary =============================
+    E:\Anaconda\Lib\site-packages\fastapi\testclient.py:1
+      StarletteDeprecationWarning: Using `httpx` with `starlette.testclient`
+      is deprecated; install `httpx2` instead.
+    -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+    8 passed, 1 warning in 0.72s
+
+The warning does not change the test result.
+
+============================================================
+D. Real DeepSeek reply check (PENDING)
+============================================================
+
+Status at capture time:
+
+    DEEPSEEK_API_KEY=NOT_SET
+    chatbot/houduan/.env=ABSENT
+
+Therefore no real DeepSeek reply was executed or claimed. A local stub upstream
+proves the request chain, but it is not evidence of a real model response.
+
+To complete this item on a machine with a real key:
+
+    cd chatbot/houduan
+    copy .env.example .env
+    # edit .env and set DEEPSEEK_API_KEY=sk-...
+    uvicorn main:app --port 8000
+
+In a second terminal:
+
+    cd chatbot/houduan
+    python check_real_chat.py
+
+Expected successful output starts with:
+
+    状态码： 200
+    reply： ...
+
+Alternatively, the direct upstream check is:
+
+    cd chatbot/houduan
+    python check_deepseek_live.py
+
+Expected successful output starts with:
+
+    状态码： 200
+    返回内容： {'choices': [...]}
+
+============================================================
+E. Final post-cleanup smoke test
+============================================================
+
+After removing the A/B/C console.log statements from index.html, the page was
+served again at http://127.0.0.1:8080/index.html and tested against the backend
+with no DEEPSEEK_API_KEY configured.
+
+Page text after clicking 发送 with message "清理后测试":
+
+    清理后测试
+    请求失败：后端未配置 DEEPSEEK_API_KEY：请在 chatbot/houduan/.env 中填写后重启服务。
+
+Browser console entries:
+
+    []
+
+This confirms that the final page still sends the request, reads the JSON
+detail on a non-2xx response, renders it, and no longer emits A/B/C debug logs.

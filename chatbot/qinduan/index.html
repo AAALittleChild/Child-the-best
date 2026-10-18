@@ -36,7 +36,6 @@
             msgList.scrollTop = msgList.scrollHeight;
 
             try {
-                console.log("标记A：即将执行fetch");
                 const res = await fetch(CHAT_API, {
                     method: 'POST',
                     headers: {
@@ -44,9 +43,7 @@
                     },
                     body: JSON.stringify({ message: userText })
                 });
-                console.log("标记B：fetch返回，拿到res");
                 const data = await res.json();
-                console.log("标记C：json解析完成");
 
                 const botDiv = document.createElement('div');
                 botDiv.textContent = res.ok
