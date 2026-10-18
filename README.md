@@ -8,3 +8,4 @@
 - 原始运行文本证据：[chatbot/docs/runtime-evidence.txt](chatbot/docs/runtime-evidence.txt)
 - 完整 pytest 运行输出：[PYTEST_RUN.txt](PYTEST_RUN.txt)
 - 数据流说明：[chatbot/docs/data_flow_description.md](chatbot/docs/data_flow_description.md)
+- rb_review_4 数据流自述：[chatbot/docs/rb_review_4_evidence.md](chatbot/docs/rb_review_4_evidence.md)
