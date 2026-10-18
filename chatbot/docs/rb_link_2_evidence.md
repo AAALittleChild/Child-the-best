@@ -29,6 +29,8 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 `✅` 只表示 `DEEPSEEK_API_KEY` 非空且已被读取，不校验 Key 有效性；有效性要到首次真实请求才会暴露（401 无效、402 余额不足）。
 
+`.env.example` 的 Key 行右侧留空；原样复制启动会显示 `⚠️ DEEPSEEK_API_KEY 未配置`，只有填入非空 Key 才显示 `✅`。
+
 端口确认（netstat 来自另一轮运行，PID 会变化）：
 
 ```text

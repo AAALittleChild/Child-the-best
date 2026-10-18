@@ -66,7 +66,7 @@ cp .env.example .env
 DEEPSEEK_API_KEY=sk-你的真实Key
 ```
 
-`.env.example` 里只有占位值 `sk-your-deepseek-api-key`，不含真实 Key。
+`.env.example` 的 `DEEPSEEK_API_KEY=` 等号右边留空；复制后必须填入真实 Key。若原样启动，会显示 `⚠️ DEEPSEEK_API_KEY 未配置`，不会显示 `✅`。
 
 ### Key 未泄露的自证
 
@@ -419,12 +419,25 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 
 #### 7.5.1 启动后端
 
+Windows PowerShell：
+
 ```powershell
 cd chatbot/houduan
 copy .env.example .env
 # 编辑 .env，填入 DEEPSEEK_API_KEY=sk-...
 uvicorn main:app --port 8000
 ```
+
+macOS / Linux：
+
+```bash
+cd chatbot/houduan
+cp .env.example .env
+# 编辑 .env，填入 DEEPSEEK_API_KEY=sk-...
+uvicorn main:app --port 8000
+```
+
+`.env.example` 的 Key 行右边是空的；如果只复制不填写，启动会显示 `⚠️ DEEPSEEK_API_KEY 未配置`，不会显示 `✅`。只有真正填入非空 Key，`✅` 才会出现。
 
 预期启动日志：
 
@@ -440,11 +453,13 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 #### 7.5.2 启动页面服务并访问
 
-在仓库根目录另开一个终端：
+**在仓库根目录**另开一个终端（当前目录应包含 `README.md` 和 `chatbot/`，不要先 `cd chatbot/houduan`；`--directory chatbot/qinduan` 是相对路径，在 houduan 下执行会 404）：
 
 ```powershell
 python -m http.server 8080 --directory chatbot/qinduan
 ```
+
+如果已经在 `chatbot/houduan`，先回到仓库根目录再执行，例如 `cd ..\..`。
 
 浏览器打开：
 

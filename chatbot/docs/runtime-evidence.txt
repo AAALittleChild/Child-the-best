@@ -27,6 +27,16 @@ The ✅ line only means DEEPSEEK_API_KEY is non-empty and was loaded. It does
 not validate the key; validity is revealed on the first real request (401 for
 invalid key, 402 for insufficient balance).
 
+Empty template check (copy .env.example to .env without editing):
+
+    ⚠️ DEEPSEEK_API_KEY 未配置
+    INFO:     Started server process [15512]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+
+This confirms that copying the empty template unchanged does not produce ✅.
+
 Port check:
 
     netstat -ano | findstr :8000
@@ -170,7 +180,8 @@ not the local stub.
 Future reproduction:
 
     cd chatbot/houduan
-    copy .env.example .env
+    # Windows: copy .env.example .env
+    # macOS/Linux: cp .env.example .env
     # edit .env and set DEEPSEEK_API_KEY=sk-...
     uvicorn main:app --port 8000
 
