@@ -192,6 +192,8 @@ INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
 
 成功路径没有 `[upstream]` 错误行。后端执行了 `res_data["choices"][0]["message"]["content"]`，返回 `{"reply": ...}`，前端再显示 `data.reply`；401 分支不会走到这段取值代码。
 
+辅助截图：[page-success.png](page-success.png)。
+
 成功路径的兜底边界：`chatbot/houduan/main.py:99` 直接取 `res_data["choices"][0]["message"]["content"]`，没有 `.get()`、默认回复、重试或备用模型；缺 `choices`、`message` 或 `content` 时由 `main.py:128` 捕获并返回 `main.py:136` 的 502；`content` 为 `null` 或非字符串时没有非空/类型校验。这里的兜底只是“失败转 502”，不是“成功内容兜底”。
 
 ## 5. 测试与最终页面状态

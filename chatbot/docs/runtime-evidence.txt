@@ -293,6 +293,8 @@ Backend access log:
     INFO:     127.0.0.1:51929 - "OPTIONS /chat HTTP/1.1" 200 OK
     INFO:     127.0.0.1:51929 - "POST /chat HTTP/1.1" 200 OK
 
+Screenshot (auxiliary): chatbot/docs/page-success.png
+
 There was no [upstream] error line on this success path. The backend executed
 res_data["choices"][0]["message"]["content"] and returned {"reply": ...}; the
 page rendered data.reply. The 401 path never reaches this extraction code, so
