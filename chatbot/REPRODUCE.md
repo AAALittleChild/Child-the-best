@@ -6,11 +6,13 @@
 > Evidence tags: description, runtime, test.
 
 原始命令输出文本见 [chatbot/docs/runtime-evidence.txt](docs/runtime-evidence.txt)。
+rb_link_2 评审证据汇总见 [chatbot/docs/rb_link_2_evidence.md](docs/rb_link_2_evidence.md)。
 
 ## 1. 实际目录结构
 
 ```text
 Child-the-best/
+├─ README.md                   # 项目入口与证据链接
 └─ chatbot/
    ├─ houduan/                  # 后端，启动目录
    │  ├─ main.py                # FastAPI 应用
@@ -23,6 +25,7 @@ Child-the-best/
    ├─ qinduan/
    │  └─ index.html             # 前端页面，用 file:// 直接打开
    ├─ docs/
+   │  ├─ rb_link_2_evidence.md   # 评审用运行与排查证据汇总
    │  └─ runtime-evidence.txt   # 原始运行文本证据
    └─ REPRODUCE.md
 ```
@@ -375,6 +378,8 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 
 这条回复来自真实 DeepSeek，不是本地桩上游。Key 只从本机 `.env` 读入进程环境，没有写入仓库或证据文件。
 
+完整评审版（含启动、访问地址、报错原文和三步定位）见 [chatbot/docs/rb_link_2_evidence.md](docs/rb_link_2_evidence.md)。
+
 若没有配置 Key，脚本会直接退出并提示先配置 `DEEPSEEK_API_KEY`，不会发出真实请求。
 
 ## 8. 异常处理与边界
@@ -414,6 +419,8 @@ reply： 你好！很高兴见到你，有什么我可以帮你的吗？无论�
 3. **判断方向**：`Failed to fetch` 通常是后端未启动、端口不对，或前端 `CHAT_API` 与本机地址不一致；如果出现 CORS 相关报错，检查 `file://` 页面的 `Origin: null` 是否被 `allow_origins=["*"]` 放行。
 
 ### 9.1 本次真实报错排查记录
+
+完整的评审版（含启动命令、访问地址、报错原文、三步定位和最终真实回复）见 [chatbot/docs/rb_link_2_evidence.md](docs/rb_link_2_evidence.md)。
 
 现象：停掉后端后，从页面发送消息，页面显示“请求失败：后端服务未启动或网络连接异常”，Console 报：
 
