@@ -1,0 +1,126 @@
+{
+  "model": "deepseek-chat",
+  "base_url": "https://api.deepseek.com",
+  "started_at": "2026-10-22T23:02:37+08:00",
+  "question": "现在几点了？请调用工具查询后告诉我。",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_current_time",
+        "description": "获取用户电脑当前所在时区的日期和时间。",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "events": [
+    {
+      "sequence": 1,
+      "timestamp": "2026-10-22T23:02:37+08:00",
+      "event": "model_request",
+      "step": 1,
+      "messages": [
+        {
+          "role": "user",
+          "content": "现在几点了？请调用工具查询后告诉我。"
+        }
+      ],
+      "tool_choice": "auto"
+    },
+    {
+      "sequence": 2,
+      "timestamp": "2026-10-22T23:02:38+08:00",
+      "event": "model_response",
+      "step": 1,
+      "message": {
+        "content": "",
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
+            "function": {
+              "arguments": "{}",
+              "name": "get_current_time"
+            },
+            "type": "function",
+            "index": 0
+          }
+        ]
+      }
+    },
+    {
+      "sequence": 3,
+      "timestamp": "2026-10-22T23:02:38+08:00",
+      "event": "tool_call",
+      "step": 1,
+      "tool_call_id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
+      "name": "get_current_time",
+      "arguments": "{}"
+    },
+    {
+      "sequence": 4,
+      "timestamp": "2026-10-22T23:02:38+08:00",
+      "event": "tool_result",
+      "step": 1,
+      "tool_call_id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
+      "name": "get_current_time",
+      "result": {
+        "ok": true,
+        "result": {
+          "date": "2026-10-22",
+          "time": "23:02:38",
+          "timezone": "中国标准时间",
+          "iso": "2026-10-22T23:02:38+08:00"
+        }
+      }
+    },
+    {
+      "sequence": 5,
+      "timestamp": "2026-10-22T23:02:38+08:00",
+      "event": "model_request",
+      "step": 2,
+      "messages": [
+        {
+          "role": "user",
+          "content": "现在几点了？请调用工具查询后告诉我。"
+        },
+        {
+          "content": "",
+          "role": "assistant",
+          "tool_calls": [
+            {
+              "id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
+              "function": {
+                "arguments": "{}",
+                "name": "get_current_time"
+              },
+              "type": "function",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
+          "content": "{\"ok\": true, \"result\": {\"date\": \"2026-10-22\", \"time\": \"23:02:38\", \"timezone\": \"中国标准时间\", \"iso\": \"2026-10-22T23:02:38+08:00\"}}"
+        }
+      ],
+      "tool_choice": "auto"
+    },
+    {
+      "sequence": 6,
+      "timestamp": "2026-10-22T23:02:39+08:00",
+      "event": "model_response",
+      "step": 2,
+      "message": {
+        "content": "现在是 **2026年10月22日 23:02:38**，你所在时区为中国标准时间（UTC+8）。",
+        "role": "assistant"
+      }
+    }
+  ],
+  "final_answer": "现在是 **2026年10月22日 23:02:38**，你所在时区为中国标准时间（UTC+8）。"
+}
