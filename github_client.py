@@ -25,11 +25,37 @@ class GitHubClient:
             follow_redirects=True,
         )
 
-    def get(self, url: str) -> Any:
-        """Send an authenticated GET request and return decoded JSON."""
+    def get(self, url: str) -> dict[str, Any]:
+        """Return a structured success or failure result."""
         response = self._client.get(url)
-        response.raise_for_status()
-        return response.json()
+        status_code = response.status_code
+
+        if status_code == 401:
+            return {
+                "ok": False,
+                "code": status_code,
+                "error": "Token 无效或已过期，请重新生成。",
+            }
+
+        if status_code == 404:
+            return {
+                "ok": False,
+                "code": status_code,
+                "error": "请求的 GitHub 资源不存在，或当前 Token 无权访问。",
+            }
+
+        if 200 <= status_code < 300:
+            return {
+                "ok": True,
+                "code": status_code,
+                "data": response.json(),
+            }
+
+        return {
+            "ok": False,
+            "code": status_code,
+            "error": f"GitHub 请求失败（HTTP {status_code}）。",
+        }
 
     def close(self) -> None:
         """Close the underlying HTTP connection pool."""
