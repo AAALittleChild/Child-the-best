@@ -23,34 +23,19 @@ MAX_STEPS = 5
 TRACE_PATH = Path(__file__).resolve().with_name("agent_trace.json")
 
 
-def _record_event(trace: dict[str, Any] | None, event: str, **data: Any) -> None:
-    if trace is None:
-        return
-
-    trace["events"].append(
-        {
-            "sequence": len(trace["events"]) + 1,
-            "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "event": event,
-            **data,
-        }
-    )
-
-
 def _write_trace(trace: dict[str, Any] | None) -> None:
     if trace is None:
         return
 
-    TRACE_PATH.write_text(
-        json.dumps(trace, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    with TRACE_PATH.open("w", encoding="utf-8") as trace_file:
+        json.dump(trace, trace_file, ensure_ascii=False, indent=2)
 
 
 def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
     """Run the model loop until it returns a final answer."""
     client = OpenAI(api_key=api_key, base_url=BASE_URL, timeout=30.0)
     messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
+    steps: list[dict[str, Any]] = []
     trace = (
         {
             "model": MODEL_NAME,
@@ -58,7 +43,7 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             "question": question,
             "tools": TOOL_DEFINITIONS,
-            "events": [],
+            "steps": steps,
             "final_answer": None,
         }
         if trace_enabled
@@ -66,14 +51,17 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
     )
 
     try:
-        for step in range(1, MAX_STEPS + 1):
-            _record_event(
-                trace,
-                "model_request",
-                step=step,
-                messages=deepcopy(messages),
-                tool_choice="auto",
-            )
+        for step_number in range(1, MAX_STEPS + 1):
+            step: dict[str, Any] = {
+                "step": step_number,
+                "request_message_count": len(messages),
+                "last_message": deepcopy(messages[-1]),
+                "tool_calls": [],
+                "tool_results": [],
+                "exit_loop": False,
+            }
+            if trace is not None:
+                steps.append(step)
 
             response = client.chat.completions.create(
                 model=MODEL_NAME,
@@ -86,16 +74,13 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
                 mode="json",
                 exclude_none=True,
             )
-            _record_event(
-                trace,
-                "model_response",
-                step=step,
-                message=assistant_payload,
-            )
+            step["model_response"] = assistant_payload
 
             tool_calls = assistant_message.tool_calls or []
             if not tool_calls:
                 answer = assistant_message.content or "模型未返回内容。"
+                step["answer"] = answer
+                step["exit_loop"] = True
                 if trace is not None:
                     trace["final_answer"] = answer
                 return answer
@@ -105,24 +90,22 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             for tool_call in tool_calls:
                 tool_name = tool_call.function.name
                 arguments = tool_call.function.arguments or "{}"
-                _record_event(
-                    trace,
-                    "tool_call",
-                    step=step,
-                    tool_call_id=tool_call.id,
-                    name=tool_name,
-                    arguments=arguments,
+                step["tool_calls"].append(
+                    {
+                        "tool_call_id": tool_call.id,
+                        "name": tool_name,
+                        "arguments": arguments,
+                    }
                 )
 
                 result = execute_tool(tool_name, arguments)
                 result_content = json.dumps(result, ensure_ascii=False)
-                _record_event(
-                    trace,
-                    "tool_result",
-                    step=step,
-                    tool_call_id=tool_call.id,
-                    name=tool_name,
-                    result=result,
+                step["tool_results"].append(
+                    {
+                        "tool_call_id": tool_call.id,
+                        "name": tool_name,
+                        "result": result,
+                    }
                 )
                 messages.append(
                     {

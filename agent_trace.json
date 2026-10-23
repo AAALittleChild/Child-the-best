@@ -1,7 +1,7 @@
 {
   "model": "deepseek-chat",
   "base_url": "https://api.deepseek.com",
-  "started_at": "2026-10-22T23:02:37+08:00",
+  "started_at": "2026-10-23T15:57:26+08:00",
   "question": "现在几点了？请调用工具查询后告诉我。",
   "tools": [
     {
@@ -17,31 +17,43 @@
       }
     }
   ],
-  "events": [
+  "steps": [
     {
-      "sequence": 1,
-      "timestamp": "2026-10-22T23:02:37+08:00",
-      "event": "model_request",
       "step": 1,
-      "messages": [
+      "request_message_count": 1,
+      "last_message": {
+        "role": "user",
+        "content": "现在几点了？请调用工具查询后告诉我。"
+      },
+      "tool_calls": [
         {
-          "role": "user",
-          "content": "现在几点了？请调用工具查询后告诉我。"
+          "tool_call_id": "call_00_8TcsmPAL2QaXBESMbGEV4510",
+          "name": "get_current_time",
+          "arguments": "{}"
         }
       ],
-      "tool_choice": "auto"
-    },
-    {
-      "sequence": 2,
-      "timestamp": "2026-10-22T23:02:38+08:00",
-      "event": "model_response",
-      "step": 1,
-      "message": {
+      "tool_results": [
+        {
+          "tool_call_id": "call_00_8TcsmPAL2QaXBESMbGEV4510",
+          "name": "get_current_time",
+          "result": {
+            "ok": true,
+            "result": {
+              "date": "2026-10-23",
+              "time": "15:57:27",
+              "timezone": "中国标准时间",
+              "iso": "2026-10-23T15:57:27+08:00"
+            }
+          }
+        }
+      ],
+      "exit_loop": false,
+      "model_response": {
         "content": "",
         "role": "assistant",
         "tool_calls": [
           {
-            "id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
+            "id": "call_00_8TcsmPAL2QaXBESMbGEV4510",
             "function": {
               "arguments": "{}",
               "name": "get_current_time"
@@ -53,74 +65,22 @@
       }
     },
     {
-      "sequence": 3,
-      "timestamp": "2026-10-22T23:02:38+08:00",
-      "event": "tool_call",
-      "step": 1,
-      "tool_call_id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
-      "name": "get_current_time",
-      "arguments": "{}"
-    },
-    {
-      "sequence": 4,
-      "timestamp": "2026-10-22T23:02:38+08:00",
-      "event": "tool_result",
-      "step": 1,
-      "tool_call_id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
-      "name": "get_current_time",
-      "result": {
-        "ok": true,
-        "result": {
-          "date": "2026-10-22",
-          "time": "23:02:38",
-          "timezone": "中国标准时间",
-          "iso": "2026-10-22T23:02:38+08:00"
-        }
-      }
-    },
-    {
-      "sequence": 5,
-      "timestamp": "2026-10-22T23:02:38+08:00",
-      "event": "model_request",
       "step": 2,
-      "messages": [
-        {
-          "role": "user",
-          "content": "现在几点了？请调用工具查询后告诉我。"
-        },
-        {
-          "content": "",
-          "role": "assistant",
-          "tool_calls": [
-            {
-              "id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
-              "function": {
-                "arguments": "{}",
-                "name": "get_current_time"
-              },
-              "type": "function",
-              "index": 0
-            }
-          ]
-        },
-        {
-          "role": "tool",
-          "tool_call_id": "call_00_QOSyCVCBh8D4niHFJd7g1823",
-          "content": "{\"ok\": true, \"result\": {\"date\": \"2026-10-22\", \"time\": \"23:02:38\", \"timezone\": \"中国标准时间\", \"iso\": \"2026-10-22T23:02:38+08:00\"}}"
-        }
-      ],
-      "tool_choice": "auto"
-    },
-    {
-      "sequence": 6,
-      "timestamp": "2026-10-22T23:02:39+08:00",
-      "event": "model_response",
-      "step": 2,
-      "message": {
-        "content": "现在是 **2026年10月22日 23:02:38**，你所在时区为中国标准时间（UTC+8）。",
+      "request_message_count": 3,
+      "last_message": {
+        "role": "tool",
+        "tool_call_id": "call_00_8TcsmPAL2QaXBESMbGEV4510",
+        "content": "{\"ok\": true, \"result\": {\"date\": \"2026-10-23\", \"time\": \"15:57:27\", \"timezone\": \"中国标准时间\", \"iso\": \"2026-10-23T15:57:27+08:00\"}}"
+      },
+      "tool_calls": [],
+      "tool_results": [],
+      "exit_loop": true,
+      "model_response": {
+        "content": "现在是 **2026年10月23日 15:57:27**（中国标准时间，UTC+8）。",
         "role": "assistant"
-      }
+      },
+      "answer": "现在是 **2026年10月23日 15:57:27**（中国标准时间，UTC+8）。"
     }
   ],
-  "final_answer": "现在是 **2026年10月22日 23:02:38**，你所在时区为中国标准时间（UTC+8）。"
+  "final_answer": "现在是 **2026年10月23日 15:57:27**（中国标准时间，UTC+8）。"
 }
