@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 
@@ -23,7 +24,29 @@ TOOL_DEFINITIONS = [
                 "additionalProperties": False,
             },
         },
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_repo_info",
+            "description": "获取 GitHub 公开仓库的语言、Star 数、简介和更新时间。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "owner": {
+                        "type": "string",
+                        "description": "仓库所有者，例如 openai。",
+                    },
+                    "repo": {
+                        "type": "string",
+                        "description": "仓库名称，例如 openai-python。",
+                    },
+                },
+                "required": ["owner", "repo"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
@@ -57,8 +80,43 @@ def get_current_time() -> dict[str, str]:
     }
 
 
-TOOL_HANDLERS: dict[str, Callable[..., dict[str, str]]] = {
+def get_repo_info(owner: str, repo: str) -> dict[str, Any]:
+    """Return a compact summary of a GitHub repository."""
+    from github_client import GitHubClient
+
+    owner_path = quote(owner.strip(), safe="")
+    repo_path = quote(repo.strip(), safe="")
+    if not owner_path or not repo_path:
+        return {
+            "ok": False,
+            "code": 400,
+            "error": "owner 和 repo 都不能为空。",
+        }
+
+    url = f"https://api.github.com/repos/{owner_path}/{repo_path}"
+    with GitHubClient() as client:
+        result = client.get(url)
+
+    if not result["ok"]:
+        return result
+
+    data = result["data"]
+    return {
+        "ok": True,
+        "code": result["code"],
+        "result": {
+            "language": data.get("language"),
+            "stars": data.get("stargazers_count"),
+            "description": data.get("description"),
+            "default_branch": data.get("default_branch"),
+            "updated_at": data.get("updated_at"),
+        },
+    }
+
+
+TOOL_HANDLERS: dict[str, Callable[..., dict[str, Any]]] = {
     "get_current_time": get_current_time,
+    "get_repo_info": get_repo_info,
 }
 
 
@@ -82,5 +140,8 @@ def execute_tool(name: str, arguments_json: str) -> dict[str, Any]:
         return {"ok": False, "error": f"工具参数不匹配：{exc}"}
     except Exception as exc:
         return {"ok": False, "error": f"工具执行失败：{exc}"}
+
+    if "ok" in result:
+        return result
 
     return {"ok": True, "result": result}
