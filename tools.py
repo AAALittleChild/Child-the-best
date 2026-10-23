@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 ENV_PATH = Path(__file__).resolve().with_name(".env")
 MAX_FILE_LINES = 200
+BINARY_REPLACEMENT_THRESHOLD = 0.05
 
 TOOL_DEFINITIONS = [
     {
@@ -164,13 +165,51 @@ def get_file_content(owner: str, repo: str, path: str) -> dict[str, Any]:
         result = client.get(url)
 
     if not result["ok"]:
+        if result.get("code") == 404:
+            return {
+                "ok": False,
+                "code": 404,
+                "error": "（文件不存在）",
+            }
         return result
 
     encoded_content = result["data"]["content"]
-    content = base64.b64decode(encoded_content).decode(
+    raw_content = base64.b64decode(encoded_content)
+    if not raw_content:
+        return {
+            "ok": True,
+            "code": result["code"],
+            "result": {
+                "path": path,
+                "content": "（文件为空）",
+                "total_lines": 0,
+                "truncated": False,
+                "empty": True,
+            },
+        }
+
+    # A NUL byte is a cheap, deterministic binary signal. For payloads without
+    # NUL, more than 5% replacement characters means UTF-8 decoding failed for
+    # most of the data, which is more consistent with binary content.
+    if b"\x00" in raw_content:
+        return {
+            "ok": False,
+            "code": 415,
+            "error": "（二进制文件，无法作为文本读取）",
+        }
+
+    content = raw_content.decode(
         "utf-8",
         errors="replace",
     )
+    replacement_ratio = content.count("\ufffd") / len(content)
+    if replacement_ratio > BINARY_REPLACEMENT_THRESHOLD:
+        return {
+            "ok": False,
+            "code": 415,
+            "error": "（二进制文件，无法作为文本读取）",
+        }
+
     lines = content.splitlines()
     total_lines = len(lines)
     truncated = total_lines > MAX_FILE_LINES
@@ -188,6 +227,7 @@ def get_file_content(owner: str, repo: str, path: str) -> dict[str, Any]:
             "content": content,
             "total_lines": total_lines,
             "truncated": truncated,
+            "empty": False,
         },
     }
 
