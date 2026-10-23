@@ -1,5 +1,6 @@
 """Tool declarations and implementations for the course project."""
 
+import base64
 import json
 import os
 from datetime import datetime
@@ -43,6 +44,32 @@ TOOL_DEFINITIONS = [
                     },
                 },
                 "required": ["owner", "repo"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_file_content",
+            "description": "读取 GitHub 公开仓库中的文本文件内容。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "owner": {
+                        "type": "string",
+                        "description": "仓库所有者，例如 openai。",
+                    },
+                    "repo": {
+                        "type": "string",
+                        "description": "仓库名称，例如 openai-python。",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "文件在仓库中的路径，例如 requirements.txt。",
+                    },
+                },
+                "required": ["owner", "repo", "path"],
                 "additionalProperties": False,
             },
         },
@@ -114,9 +141,49 @@ def get_repo_info(owner: str, repo: str) -> dict[str, Any]:
     }
 
 
+def get_file_content(owner: str, repo: str, path: str) -> dict[str, Any]:
+    """Return decoded text content from a file in a GitHub repository."""
+    from github_client import GitHubClient
+
+    owner_path = quote(owner.strip(), safe="")
+    repo_path = quote(repo.strip(), safe="")
+    file_path = quote(path.strip(), safe="/")
+    if not owner_path or not repo_path or not file_path:
+        return {
+            "ok": False,
+            "code": 400,
+            "error": "owner、repo 和 path 都不能为空。",
+        }
+
+    url = (
+        f"https://api.github.com/repos/{owner_path}/{repo_path}"
+        f"/contents/{file_path}"
+    )
+    with GitHubClient() as client:
+        result = client.get(url)
+
+    if not result["ok"]:
+        return result
+
+    encoded_content = result["data"]["content"]
+    content = base64.b64decode(encoded_content).decode(
+        "utf-8",
+        errors="replace",
+    )
+    return {
+        "ok": True,
+        "code": result["code"],
+        "result": {
+            "path": path,
+            "content": content,
+        },
+    }
+
+
 TOOL_HANDLERS: dict[str, Callable[..., dict[str, Any]]] = {
     "get_current_time": get_current_time,
     "get_repo_info": get_repo_info,
+    "get_file_content": get_file_content,
 }
 
 
