@@ -86,6 +86,7 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             "started_at": _timestamp(),
             "question": question,
             "steps": steps,
+            "stop_reason": None,
         }
         if trace_enabled
         else None
@@ -109,6 +110,7 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             if not tool_calls:
                 answer = assistant_message.content or "模型未返回内容。"
                 if trace is not None:
+                    trace["stop_reason"] = "completed"
                     steps.append(
                         {
                             "step": step_number,
@@ -154,6 +156,7 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
         message = f"达到最大步数 {MAX_STEPS}，未能得到最终回答。"
         if trace is not None:
             trace["error"] = message
+            trace["stop_reason"] = "max_steps_reached"
             steps.append(
                 {
                     "step": MAX_STEPS,
@@ -169,6 +172,7 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
         message = f"调用模型失败：{exc}"
         if trace is not None:
             trace["error"] = message
+            trace["stop_reason"] = "error"
             steps.append(
                 {
                     "step": len(steps) + 1,
@@ -181,6 +185,8 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             )
         return message
     finally:
+        if trace is not None and trace["stop_reason"] is None:
+            trace["stop_reason"] = "error"
         _write_trace(trace)
 
 
