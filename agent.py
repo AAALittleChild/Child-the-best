@@ -2,7 +2,6 @@
 
 import argparse
 import json
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,6 +22,50 @@ MAX_STEPS = 5
 TRACE_PATH = Path(__file__).resolve().with_name("agent_trace.json")
 
 
+def _timestamp() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _trace_arguments(arguments_json: str) -> Any:
+    try:
+        arguments = json.loads(arguments_json or "{}")
+    except json.JSONDecodeError:
+        return arguments_json
+    return arguments
+
+
+def _summarize_tool_result(tool_name: str, result: dict[str, Any]) -> str:
+    if not result.get("ok"):
+        code = result.get("code", "unknown")
+        error = str(result.get("error", "未知错误")).replace("\n", " ")
+        return f"ok=false, code={code}, error={error[:160]}"
+
+    payload = result.get("result")
+    if tool_name == "get_file_content" and isinstance(payload, dict):
+        path = payload.get("path", "unknown")
+        if payload.get("empty"):
+            return f"ok=true, 文件 {path} 为空"
+        status = "已截断" if payload.get("truncated") else "未截断"
+        return (
+            f"ok=true, 读取 {path} 共 {payload.get('total_lines', 0)} 行, "
+            f"{status}"
+        )
+
+    if tool_name == "get_repo_info" and isinstance(payload, dict):
+        return (
+            "ok=true, 仓库概况: "
+            f"language={payload.get('language')}, "
+            f"stars={payload.get('stars')}, "
+            f"default_branch={payload.get('default_branch')}"
+        )
+
+    if tool_name == "get_current_time" and isinstance(payload, dict):
+        return f"ok=true, 当前时间: {payload.get('iso', 'unknown')}"
+
+    compact_payload = json.dumps(payload, ensure_ascii=False)
+    return f"ok=true, result={compact_payload[:160]}"
+
+
 def _write_trace(trace: dict[str, Any] | None) -> None:
     if trace is None:
         return
@@ -40,11 +83,9 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
         {
             "model": MODEL_NAME,
             "base_url": BASE_URL,
-            "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "started_at": _timestamp(),
             "question": question,
-            "tools": TOOL_DEFINITIONS,
             "steps": steps,
-            "final_answer": None,
         }
         if trace_enabled
         else None
@@ -52,17 +93,6 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
 
     try:
         for step_number in range(1, MAX_STEPS + 1):
-            step: dict[str, Any] = {
-                "step": step_number,
-                "request_message_count": len(messages),
-                "last_message": deepcopy(messages[-1]),
-                "tool_calls": [],
-                "tool_results": [],
-                "exit_loop": False,
-            }
-            if trace is not None:
-                steps.append(step)
-
             response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=messages,
@@ -74,15 +104,21 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
                 mode="json",
                 exclude_none=True,
             )
-            step["model_response"] = assistant_payload
 
             tool_calls = assistant_message.tool_calls or []
             if not tool_calls:
                 answer = assistant_message.content or "模型未返回内容。"
-                step["answer"] = answer
-                step["exit_loop"] = True
                 if trace is not None:
-                    trace["final_answer"] = answer
+                    steps.append(
+                        {
+                            "step": step_number,
+                            "tool_name": None,
+                            "arguments": None,
+                            "result_summary": "无工具调用，生成最终回答并退出循环",
+                            "timestamp": _timestamp(),
+                            "exit_loop": True,
+                        }
+                    )
                 return answer
 
             messages.append(assistant_payload)
@@ -90,23 +126,23 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             for tool_call in tool_calls:
                 tool_name = tool_call.function.name
                 arguments = tool_call.function.arguments or "{}"
-                step["tool_calls"].append(
-                    {
-                        "tool_call_id": tool_call.id,
-                        "name": tool_name,
-                        "arguments": arguments,
-                    }
-                )
 
                 result = execute_tool(tool_name, arguments)
                 result_content = json.dumps(result, ensure_ascii=False)
-                step["tool_results"].append(
-                    {
-                        "tool_call_id": tool_call.id,
-                        "name": tool_name,
-                        "result": result,
-                    }
-                )
+                if trace is not None:
+                    steps.append(
+                        {
+                            "step": step_number,
+                            "tool_name": tool_name,
+                            "arguments": _trace_arguments(arguments),
+                            "result_summary": _summarize_tool_result(
+                                tool_name,
+                                result,
+                            ),
+                            "timestamp": _timestamp(),
+                            "exit_loop": False,
+                        }
+                    )
                 messages.append(
                     {
                         "role": "tool",
@@ -118,11 +154,31 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
         message = f"达到最大步数 {MAX_STEPS}，未能得到最终回答。"
         if trace is not None:
             trace["error"] = message
+            steps.append(
+                {
+                    "step": MAX_STEPS,
+                    "tool_name": None,
+                    "arguments": None,
+                    "result_summary": message,
+                    "timestamp": _timestamp(),
+                    "exit_loop": True,
+                }
+            )
         return message
     except OpenAIError as exc:
         message = f"调用模型失败：{exc}"
         if trace is not None:
             trace["error"] = message
+            steps.append(
+                {
+                    "step": len(steps) + 1,
+                    "tool_name": None,
+                    "arguments": None,
+                    "result_summary": message[:200],
+                    "timestamp": _timestamp(),
+                    "exit_loop": True,
+                }
+            )
         return message
     finally:
         _write_trace(trace)
