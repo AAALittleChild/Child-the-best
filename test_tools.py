@@ -110,5 +110,54 @@ class GetFileContentTests(unittest.TestCase):
         self.assertIn("二进制", result["error"])
 
 
+class ListFilesTests(unittest.TestCase):
+    def test_list_files_returns_compact_entries(self) -> None:
+        client = MagicMock()
+        client.__enter__.return_value = client
+        client.get.return_value = {
+            "ok": True,
+            "code": 200,
+            "data": [
+                {
+                    "name": "src",
+                    "path": "src",
+                    "type": "dir",
+                    "size": 0,
+                    "download_url": None,
+                },
+                {
+                    "name": "pyproject.toml",
+                    "path": "pyproject.toml",
+                    "type": "file",
+                    "size": 12345,
+                    "download_url": "https://example.invalid",
+                },
+            ],
+        }
+
+        with patch("github_client.GitHubClient", return_value=client):
+            result = execute_tool(
+                "list_files",
+                '{"owner": "openai", "repo": "openai-python"}',
+            )
+
+        client.get.assert_called_once_with(
+            "https://api.github.com/repos/openai/openai-python/contents"
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(
+            result["result"]["entries"],
+            [
+                {"name": "src", "path": "src", "type": "dir", "size": 0},
+                {
+                    "name": "pyproject.toml",
+                    "path": "pyproject.toml",
+                    "type": "file",
+                    "size": 12345,
+                },
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

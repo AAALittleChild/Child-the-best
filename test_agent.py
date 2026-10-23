@@ -37,8 +37,10 @@ class AgentLoopTests(unittest.TestCase):
         tool_call = SimpleNamespace(
             id="call_1",
             function=SimpleNamespace(
-                name="get_current_time",
-                arguments="{}",
+                name="get_file_content",
+                arguments=(
+                    '{"owner":"owner","repo":"repo","path":"file.py"}'
+                ),
             ),
         )
         responses = [
@@ -72,10 +74,25 @@ class AgentLoopTests(unittest.TestCase):
             with (
                 patch.object(agent, "TRACE_PATH", trace_path),
                 patch.object(agent, "REPORT_PATH", report_path),
+                patch.object(
+                    agent,
+                    "EVIDENCE_DIR",
+                    Path(temp_dir) / "evidence",
+                ),
                 patch("agent.OpenAI") as openai_cls,
                 patch(
                     "agent.execute_tool",
-                    return_value={"ok": True, "result": {"value": "ok"}},
+                    return_value={
+                        "ok": True,
+                        "code": 200,
+                        "result": {
+                            "path": "file.py",
+                            "content": "print('evidence')\n",
+                            "total_lines": 1,
+                            "truncated": False,
+                            "empty": False,
+                        },
+                    },
                 ),
             ):
                 create = openai_cls.return_value.chat.completions.create
@@ -88,6 +105,8 @@ class AgentLoopTests(unittest.TestCase):
 
             report_text = report_path.read_text(encoding="utf-8")
             trace = json.loads(trace_path.read_text(encoding="utf-8"))
+            evidence_path = Path(temp_dir) / trace["evidence_files"][0]
+            evidence_text = evidence_path.read_text(encoding="utf-8")
 
         self.assertTrue(report_text.startswith("## 任务概述"))
         self.assertEqual(report, report_text)
@@ -97,8 +116,13 @@ class AgentLoopTests(unittest.TestCase):
         self.assertIn("## 任务概述", report_messages[-1]["content"])
         self.assertIn("[见 trace step N]", report_messages[-1]["content"])
         self.assertIn("- step 1:", report_messages[-1]["content"])
+        self.assertIn("httpx2", report_messages[-1]["content"])
+        self.assertIn("evidence/owner_repo_file.py.txt", report_messages[-1]["content"])
         self.assertNotIn("tools", create.call_args_list[2].kwargs)
         self.assertEqual(trace["stop_reason"], "completed")
+        self.assertEqual(trace["actual_steps"], 1)
+        self.assertEqual(trace["max_steps"], agent.MAX_STEPS)
+        self.assertEqual(evidence_text, "print('evidence')\n")
 
     def test_max_steps_returns_safely_and_records_reason(self) -> None:
         responses = []
@@ -140,6 +164,8 @@ class AgentLoopTests(unittest.TestCase):
 
         self.assertEqual(answer, f"达到最大步数 {agent.MAX_STEPS}，未能得到最终回答。")
         self.assertEqual(trace["stop_reason"], "max_steps_reached")
+        self.assertEqual(trace["max_steps"], agent.MAX_STEPS)
+        self.assertEqual(trace["actual_steps"], agent.MAX_STEPS)
         self.assertEqual(create.call_count, agent.MAX_STEPS)
         self.assertEqual(trace["steps"][-1]["exit_loop"], True)
 

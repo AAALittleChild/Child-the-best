@@ -76,6 +76,32 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "列出 GitHub 仓库指定目录中的文件和子目录。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "owner": {
+                        "type": "string",
+                        "description": "仓库所有者，例如 openai。",
+                    },
+                    "repo": {
+                        "type": "string",
+                        "description": "仓库名称，例如 openai-python。",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "目录路径；留空表示仓库根目录。",
+                    },
+                },
+                "required": ["owner", "repo"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
@@ -232,10 +258,62 @@ def get_file_content(owner: str, repo: str, path: str) -> dict[str, Any]:
     }
 
 
+def list_files(owner: str, repo: str, path: str = "") -> dict[str, Any]:
+    """List files and directories under a GitHub repository path."""
+    from github_client import GitHubClient
+
+    owner_path = quote(owner.strip(), safe="")
+    repo_path = quote(repo.strip(), safe="")
+    directory_path = quote(path.strip(), safe="/")
+    if not owner_path or not repo_path:
+        return {
+            "ok": False,
+            "code": 400,
+            "error": "owner 和 repo 都不能为空。",
+        }
+
+    url = f"https://api.github.com/repos/{owner_path}/{repo_path}/contents"
+    if directory_path:
+        url += f"/{directory_path}"
+
+    with GitHubClient() as client:
+        result = client.get(url)
+
+    if not result["ok"]:
+        return result
+
+    data = result["data"]
+    if not isinstance(data, list):
+        return {
+            "ok": False,
+            "code": 422,
+            "error": "目标路径不是目录，无法列出文件。",
+        }
+
+    entries = [
+        {
+            "name": item.get("name"),
+            "path": item.get("path"),
+            "type": item.get("type"),
+            "size": item.get("size"),
+        }
+        for item in data
+    ]
+    return {
+        "ok": True,
+        "code": result["code"],
+        "result": {
+            "path": path or "/",
+            "entries": entries,
+        },
+    }
+
+
 TOOL_HANDLERS: dict[str, Callable[..., dict[str, Any]]] = {
     "get_current_time": get_current_time,
     "get_repo_info": get_repo_info,
     "get_file_content": get_file_content,
+    "list_files": list_files,
 }
 
 

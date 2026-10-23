@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -18,9 +19,10 @@ from tools import (
 
 BASE_URL = "https://api.deepseek.com"
 MODEL_NAME = "deepseek-chat"
-MAX_STEPS = 5
+MAX_STEPS = 10
 TRACE_PATH = Path(__file__).resolve().with_name("agent_trace.json")
 REPORT_PATH = Path(__file__).resolve().with_name("report.md")
+EVIDENCE_DIR = Path(__file__).resolve().with_name("evidence")
 
 
 def _timestamp() -> str:
@@ -63,8 +65,44 @@ def _summarize_tool_result(tool_name: str, result: dict[str, Any]) -> str:
     if tool_name == "get_current_time" and isinstance(payload, dict):
         return f"ok=true, 当前时间: {payload.get('iso', 'unknown')}"
 
+    if tool_name == "list_files" and isinstance(payload, dict):
+        entries = payload.get("entries", [])
+        names = [str(entry.get("name")) for entry in entries[:8]]
+        return (
+            f"ok=true, 列出 {payload.get('path', '/')} 共 {len(entries)} 项: "
+            f"{', '.join(names)}"
+        )
+
     compact_payload = json.dumps(payload, ensure_ascii=False)
     return f"ok=true, result={compact_payload[:160]}"
+
+
+def _save_file_evidence(
+    tool_name: str,
+    arguments: Any,
+    result: dict[str, Any],
+) -> str | None:
+    if tool_name != "get_file_content" or not result.get("ok"):
+        return None
+    if not isinstance(arguments, dict):
+        return None
+
+    payload = result.get("result")
+    if not isinstance(payload, dict) or payload.get("empty"):
+        return None
+
+    content = payload.get("content")
+    if not isinstance(content, str):
+        return None
+
+    owner = str(arguments.get("owner", "repo"))
+    repo = str(arguments.get("repo", "unknown"))
+    file_path = str(payload.get("path") or arguments.get("path") or "file")
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", f"{owner}_{repo}_{file_path}")
+    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    evidence_path = EVIDENCE_DIR / f"{stem}.txt"
+    evidence_path.write_text(content, encoding="utf-8")
+    return evidence_path.relative_to(EVIDENCE_DIR.parent).as_posix()
 
 
 def _format_steps_for_report(steps: list[dict[str, Any]]) -> str:
@@ -84,7 +122,9 @@ def _generate_report(
     client: OpenAI,
     messages: list[dict[str, Any]],
     steps: list[dict[str, Any]],
+    evidence_files: list[str],
 ) -> str:
+    evidence_text = "\n".join(f"- {path}" for path in evidence_files) or "无"
     report_instruction = f"""请根据完整对话和工具执行记录，整理一份 Markdown 报告。
 
 报告必须严格包含以下四个二级标题，并保持顺序：
@@ -96,8 +136,16 @@ def _generate_report(
 执行过程和分析结果中，凡是依据工具结果的结论，必须在句末标注对应来源，
 格式为 [见 trace step N]。只能引用下面列出的步骤编号，不得虚构。
 
+分析结果中必须设置“关键声明核验”小节，逐项写出关键文件原文支持的
+项目版本、Python 版本、构建后端、构建依赖和运行时依赖。必须严格保留原文
+中的包名和版本约束；如果原文是 httpx2 或 httpcore2，不要擅自改成
+httpx、httpcore 或 distro。无法从原文确认的内容必须明确标注为未确认。
+
 工具步骤映射：
 {_format_steps_for_report(steps)}
+
+可引用的原文证据文件：
+{evidence_text}
 
 只输出 Markdown 报告正文，不要使用外层代码围栏。"""
     report_messages = [
@@ -127,6 +175,7 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
     client = OpenAI(api_key=api_key, base_url=BASE_URL, timeout=30.0)
     messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
     steps: list[dict[str, Any]] = []
+    evidence_files: list[str] = []
     trace = (
         {
             "model": MODEL_NAME,
@@ -134,6 +183,9 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             "started_at": _timestamp(),
             "question": question,
             "steps": steps,
+            "max_steps": MAX_STEPS,
+            "actual_steps": 0,
+            "evidence_files": evidence_files,
             "stop_reason": None,
         }
         if trace_enabled
@@ -167,9 +219,17 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
                         "exit_loop": True,
                     }
                 )
-                report = _generate_report(client, messages, steps)
+                report = _generate_report(
+                    client,
+                    messages,
+                    steps,
+                    evidence_files,
+                )
                 REPORT_PATH.write_text(report, encoding="utf-8")
                 if trace is not None:
+                    trace["actual_steps"] = sum(
+                        1 for step in steps if step["tool_name"] is not None
+                    )
                     trace["stop_reason"] = "completed"
                 return report
 
@@ -178,14 +238,22 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
             for tool_call in tool_calls:
                 tool_name = tool_call.function.name
                 arguments = tool_call.function.arguments or "{}"
+                parsed_arguments = _trace_arguments(arguments)
 
                 result = execute_tool(tool_name, arguments)
                 result_content = json.dumps(result, ensure_ascii=False)
+                evidence_path = _save_file_evidence(
+                    tool_name,
+                    parsed_arguments,
+                    result,
+                )
+                if evidence_path is not None:
+                    evidence_files.append(evidence_path)
                 steps.append(
                     {
                         "step": step_number,
                         "tool_name": tool_name,
-                        "arguments": _trace_arguments(arguments),
+                        "arguments": parsed_arguments,
                         "result_summary": _summarize_tool_result(
                             tool_name,
                             result,
@@ -194,6 +262,10 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
                         "exit_loop": False,
                     }
                 )
+                if trace is not None:
+                    trace["actual_steps"] = sum(
+                        1 for step in steps if step["tool_name"] is not None
+                    )
                 messages.append(
                     {
                         "role": "tool",
