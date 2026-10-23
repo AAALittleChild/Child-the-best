@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 
 ENV_PATH = Path(__file__).resolve().with_name(".env")
+MAX_FILE_LINES = 200
 
 TOOL_DEFINITIONS = [
     {
@@ -170,12 +171,23 @@ def get_file_content(owner: str, repo: str, path: str) -> dict[str, Any]:
         "utf-8",
         errors="replace",
     )
+    lines = content.splitlines()
+    total_lines = len(lines)
+    truncated = total_lines > MAX_FILE_LINES
+    if truncated:
+        content = (
+            "\n".join(lines[:MAX_FILE_LINES])
+            + f"\n（已截断，仅显示前 {MAX_FILE_LINES} 行，共 {total_lines} 行）"
+        )
+
     return {
         "ok": True,
         "code": result["code"],
         "result": {
             "path": path,
             "content": content,
+            "total_lines": total_lines,
+            "truncated": truncated,
         },
     }
 
