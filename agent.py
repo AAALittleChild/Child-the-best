@@ -20,6 +20,7 @@ BASE_URL = "https://api.deepseek.com"
 MODEL_NAME = "deepseek-chat"
 MAX_STEPS = 5
 TRACE_PATH = Path(__file__).resolve().with_name("agent_trace.json")
+REPORT_PATH = Path(__file__).resolve().with_name("report.md")
 
 
 def _timestamp() -> str:
@@ -66,6 +67,53 @@ def _summarize_tool_result(tool_name: str, result: dict[str, Any]) -> str:
     return f"ok=true, result={compact_payload[:160]}"
 
 
+def _format_steps_for_report(steps: list[dict[str, Any]]) -> str:
+    lines = []
+    for step in steps:
+        arguments = json.dumps(step.get("arguments"), ensure_ascii=False)
+        lines.append(
+            f"- step {step['step']}: "
+            f"tool={step.get('tool_name') or 'none'}; "
+            f"arguments={arguments}; "
+            f"result={step.get('result_summary', '')}"
+        )
+    return "\n".join(lines)
+
+
+def _generate_report(
+    client: OpenAI,
+    messages: list[dict[str, Any]],
+    steps: list[dict[str, Any]],
+) -> str:
+    report_instruction = f"""请根据完整对话和工具执行记录，整理一份 Markdown 报告。
+
+报告必须严格包含以下四个二级标题，并保持顺序：
+## 任务概述
+## 执行过程
+## 分析结果
+## 结论
+
+执行过程和分析结果中，凡是依据工具结果的结论，必须在句末标注对应来源，
+格式为 [见 trace step N]。只能引用下面列出的步骤编号，不得虚构。
+
+工具步骤映射：
+{_format_steps_for_report(steps)}
+
+只输出 Markdown 报告正文，不要使用外层代码围栏。"""
+    report_messages = [
+        *messages,
+        {"role": "user", "content": report_instruction},
+    ]
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=report_messages,
+    )
+    report = response.choices[0].message.content or ""
+    if not report.strip():
+        report = "# 项目分析报告\n\n模型未生成报告内容。"
+    return report.strip() + "\n"
+
+
 def _write_trace(trace: dict[str, Any] | None) -> None:
     if trace is None:
         return
@@ -75,7 +123,7 @@ def _write_trace(trace: dict[str, Any] | None) -> None:
 
 
 def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
-    """Run the model loop until it returns a final answer."""
+    """Run the tool loop and write a Markdown report after completion."""
     client = OpenAI(api_key=api_key, base_url=BASE_URL, timeout=30.0)
     messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
     steps: list[dict[str, Any]] = []
@@ -108,20 +156,22 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
 
             tool_calls = assistant_message.tool_calls or []
             if not tool_calls:
-                answer = assistant_message.content or "模型未返回内容。"
+                messages.append(assistant_payload)
+                steps.append(
+                    {
+                        "step": step_number,
+                        "tool_name": None,
+                        "arguments": None,
+                        "result_summary": "无工具调用，生成最终回答并退出循环",
+                        "timestamp": _timestamp(),
+                        "exit_loop": True,
+                    }
+                )
+                report = _generate_report(client, messages, steps)
+                REPORT_PATH.write_text(report, encoding="utf-8")
                 if trace is not None:
                     trace["stop_reason"] = "completed"
-                    steps.append(
-                        {
-                            "step": step_number,
-                            "tool_name": None,
-                            "arguments": None,
-                            "result_summary": "无工具调用，生成最终回答并退出循环",
-                            "timestamp": _timestamp(),
-                            "exit_loop": True,
-                        }
-                    )
-                return answer
+                return report
 
             messages.append(assistant_payload)
 
@@ -131,20 +181,19 @@ def run_agent(question: str, api_key: str, trace_enabled: bool = False) -> str:
 
                 result = execute_tool(tool_name, arguments)
                 result_content = json.dumps(result, ensure_ascii=False)
-                if trace is not None:
-                    steps.append(
-                        {
-                            "step": step_number,
-                            "tool_name": tool_name,
-                            "arguments": _trace_arguments(arguments),
-                            "result_summary": _summarize_tool_result(
-                                tool_name,
-                                result,
-                            ),
-                            "timestamp": _timestamp(),
-                            "exit_loop": False,
-                        }
-                    )
+                steps.append(
+                    {
+                        "step": step_number,
+                        "tool_name": tool_name,
+                        "arguments": _trace_arguments(arguments),
+                        "result_summary": _summarize_tool_result(
+                            tool_name,
+                            result,
+                        ),
+                        "timestamp": _timestamp(),
+                        "exit_loop": False,
+                    }
+                )
                 messages.append(
                     {
                         "role": "tool",
@@ -219,8 +268,8 @@ def main() -> None:
         print("未配置 DEEPSEEK_API_KEY，请在 .env 中填写后重试。")
         return
 
-    answer = run_agent(question, api_key, trace_enabled=args.trace)
-    print(f"回答：{answer}")
+    run_agent(question, api_key, trace_enabled=args.trace)
+    print(f"报告已写入：{REPORT_PATH}")
     if args.trace:
         print(f"Trace 已写入：{TRACE_PATH}")
 

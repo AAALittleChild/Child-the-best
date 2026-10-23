@@ -33,6 +33,73 @@ class DummyMessage:
 
 
 class AgentLoopTests(unittest.TestCase):
+    def test_completed_loop_generates_markdown_report(self) -> None:
+        tool_call = SimpleNamespace(
+            id="call_1",
+            function=SimpleNamespace(
+                name="get_current_time",
+                arguments="{}",
+            ),
+        )
+        responses = [
+            SimpleNamespace(
+                choices=[
+                    SimpleNamespace(message=DummyMessage(None, [tool_call]))
+                ]
+            ),
+            SimpleNamespace(
+                choices=[
+                    SimpleNamespace(message=DummyMessage("初步回答"))
+                ]
+            ),
+            SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=DummyMessage(
+                            "## 任务概述\n概述\n"
+                            "## 执行过程\n执行 [见 trace step 1]\n"
+                            "## 分析结果\n分析 [见 trace step 1]\n"
+                            "## 结论\n结论 [见 trace step 1]"
+                        )
+                    )
+                ]
+            ),
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            trace_path = Path(temp_dir) / "agent_trace.json"
+            report_path = Path(temp_dir) / "report.md"
+            with (
+                patch.object(agent, "TRACE_PATH", trace_path),
+                patch.object(agent, "REPORT_PATH", report_path),
+                patch("agent.OpenAI") as openai_cls,
+                patch(
+                    "agent.execute_tool",
+                    return_value={"ok": True, "result": {"value": "ok"}},
+                ),
+            ):
+                create = openai_cls.return_value.chat.completions.create
+                create.side_effect = responses
+                report = agent.run_agent(
+                    "analyze",
+                    "test-key",
+                    trace_enabled=True,
+                )
+
+            report_text = report_path.read_text(encoding="utf-8")
+            trace = json.loads(trace_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(report_text.startswith("## 任务概述"))
+        self.assertEqual(report, report_text)
+        self.assertEqual(create.call_count, 3)
+        report_messages = create.call_args_list[2].kwargs["messages"]
+        self.assertEqual(report_messages[-2]["content"], "初步回答")
+        self.assertIn("## 任务概述", report_messages[-1]["content"])
+        self.assertIn("[见 trace step N]", report_messages[-1]["content"])
+        self.assertIn("- step 1:", report_messages[-1]["content"])
+        self.assertNotIn("tools", create.call_args_list[2].kwargs)
+        self.assertEqual(trace["stop_reason"], "completed")
+
     def test_max_steps_returns_safely_and_records_reason(self) -> None:
         responses = []
         for number in range(agent.MAX_STEPS):
